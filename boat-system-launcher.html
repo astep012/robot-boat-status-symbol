@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boat System Launcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #00bfff;
+            margin-bottom: 30px;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            padding: 20px 40px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+        }
+        
+        .instructions {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+        }
+        
+        .instructions h2 {
+            color: #00bfff;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Boat Status System Launcher</h1>
+    
+    <div class="button-container">
+        <button onclick="openDisplay()">Open Display</button>
+        <button onclick="openAssignment()">Open Assignment Form</button>
+        <button onclick="openStatus()">Open Status Form</button>
+        <button onclick="openAll()">Open All Windows</button>
+    </div>
+    
+    <div class="instructions">
+        <h2>Instructions:</h2>
+        <ol>
+            <li>Click "Open All Windows" or open each component individually</li>
+            <li>Start with the Assignment Form to assign boats to groups</li>
+            <li>Use the Status Form to update boat statuses</li>
+            <li>Watch the Display update in real-time</li>
+        </ol>
+        
+        <h2>Important:</h2>
+        <ul>
+            <li>Keep this launcher window open</li>
+            <li>All windows must be opened from here for communication to work</li>
+            <li>If updates don't appear, check browser popup blocker</li>
+        </ul>
+    </div>
+    
+    <div id="status" class="status" style="display: none;">
+        <p>Windows opened! They should now communicate properly.</p>
+    </div>
+
+    <script>
+        let displayWindow = null;
+        let assignmentWindow = null;
+        let statusWindow = null;
+        
+        function openDisplay() {
+            displayWindow = window.open('boat-status-display.html', 'display', 'width=1200,height=800');
+            checkWindows();
+        }
+        
+        function openAssignment() {
+            assignmentWindow = window.open('boat-assignment-form.html', 'assignment', 'width=600,height=700');
+            checkWindows();
+        }
+        
+        function openStatus() {
+            statusWindow = window.open('boat-status-form.html', 'status', 'width=600,height=800');
+            checkWindows();
+        }
+        
+        function openAll() {
+            openDisplay();
+            setTimeout(openAssignment, 500);
+            setTimeout(openStatus, 1000);
+        }
+        
+        function checkWindows() {
+            const allOpen = displayWindow && assignmentWindow && statusWindow;
+            if (allOpen) {
+                document.getElementById('status').style.display = 'block';
+            }
+        }
+        
+        // Listen for messages and relay them
+        window.addEventListener('message', function(event) {
+            console.log('Launcher received message:', event.data);
+            
+            // Relay to display window
+            if (displayWindow && !displayWindow.closed) {
+                displayWindow.postMessage(event.data, '*');
+            }
+        });
+    </script>
+</body>
+</html>
