@@ -1931,7 +1931,7 @@
             
             boatData.location = areaId.replace('Area', '');
 
-	    / Clear position lock when boat actually moves
+	    // Clear position lock when boat actually moves
             if (window.positionLockedBoats && window.positionLockedBoats.has(boatId)) {
                 window.positionLockedBoats.delete(boatId);
                 console.log(`Position lock cleared for boat ${boatId} after movement to ${areaId}`);
