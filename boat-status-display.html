@@ -1,0 +1,2484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boat Status Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow-x: auto;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.85em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Updated boat sizes - G boats slightly larger to fit 3-digit numbers */
+        /* Legend boat wrapper for outline */
+        .legend-boat-wrapper {
+            width: 16px;
+            height: 32px;
+            position: relative;
+            padding: 2px;
+            background: #fff;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            display: inline-block;
+        }
+
+        .legend-boat-wrapper.user-leg {
+            background: #b19cd9;
+        }
+
+        .legend-boat-wrapper.user-lat {
+            background: #00bfff;
+        }
+
+        .legend-boat {
+            width: 12px;
+            height: 28px;
+            position: relative;
+            overflow: visible;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ff0000;
+        }
+
+        /* Apply status colors to legend boats */
+        .legend-boat.status-none { background-color: #ff0000 !important; }
+        .legend-boat.status-platform { background-color: #ff8c00 !important; }
+        .legend-boat.status-pierside { background-color: #ffff00 !important; }
+        .legend-boat.status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                #ffffff,
+                #ffffff 2px,
+                #00ff00 2px,
+                #00ff00 4px
+            ) !important;
+        }
+        .legend-boat.status-operational { background-color: #00ff00 !important; }
+
+        /* White background for user group and size examples */
+        .legend-boat-wrapper.user-leg .legend-boat,
+        .legend-boat-wrapper.user-lat .legend-boat,
+        .legend-boat.boat-size-large,
+        .legend-boat.boat-size-small {
+            background-color: #ffffff !important;
+        }
+
+        /* Legend user indicators - smaller size */
+        .legend-boat-wrapper .user-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .legend-boat-wrapper.user-leg .user-indicator {
+            background-color: #b19cd9;
+        }
+
+        .legend-boat-wrapper.user-lat .user-indicator {
+            background-color: #00bfff;
+        }
+
+        /* Legend boat numbers - with box background */
+        .legend-boat .boat-number {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 1px 2px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: bold;
+            z-index: 2;
+            white-space: nowrap;
+        }
+
+        /* Size variations for legend - adjusted for G boats */
+        .legend-boat.boat-size-small {
+            width: 10px;
+            height: 21px;
+            font-size: 7px;
+        }
+        
+        /* Small boat wrapper */
+        .legend-boat-wrapper:has(.boat-size-small) {
+            width: 14px;
+            height: 25px;
+        }
+
+        .main-layout {
+    		display: flex;
+    		flex-direction: column;
+   		gap: 20px;
+    		margin-bottom: 20px;
+	}
+
+        /* Pier area with proper scaling */
+        .pier-area {
+            position: relative;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 10px;
+            min-height: 600px;
+            height: 600px;
+	    width: 100%;
+            max-height: 600px;
+            overflow: hidden;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            cursor: pointer;
+            aspect-ratio: 7/5;
+        }
+
+        .status-areas {
+    		display: flex;
+    		gap: 20px;
+    		flex-wrap: wrap;
+    		justify-content: center;
+	}
+
+        .status-area-container {
+            position: relative;
+            margin-bottom: 30px;
+	    width: 100%;
+        }
+
+        .status-area-container h3 {
+    	margin-bottom: 5px;
+    	color: #00bfff;
+    	font-size: 1.1em;
+    	text-align: center;
+	}
+
+	@media (min-width: 1400px) {
+    .main-layout {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+    }
+    
+    .status-areas {
+        flex-direction: column;
+        width: 400px;
+    }
+    
+    .status-area-container {
+        max-width: none;
+    }
+}
+
+        .status-area {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 15px;
+            padding-top: 10px;
+            position: relative;
+            width: 400px;
+            overflow: visible !important;
+            min-height: 120px !important;
+            transition: height 0.3s ease;
+            cursor: pointer;
+        }
+
+        /* Special styling for operational area to allow more space */
+        #operationalArea {
+            min-height: 200px;
+        }
+
+        /* Boat styles - G boats slightly larger to accommodate 3-digit numbers */
+        .boat {
+            position: absolute;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            overflow: visible;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            background-color: #ff0000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .boat:active {
+            cursor: grabbing;
+        }
+
+        /* Create boat wrapper for outline effect */
+        .boat-wrapper {
+            position: absolute;
+            background: transparent;
+            display: inline-block;
+            cursor: grab;
+        }
+
+        .boat-wrapper:active {
+            cursor: grabbing;
+        }
+
+        .boat-outline {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: #fff;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            z-index: 0;
+        }
+
+        .boat-wrapper.user-leg .boat-outline {
+            background: #b19cd9;
+        }
+
+        .boat-wrapper.user-lat .boat-outline {
+            background: #00bfff;
+        }
+
+        /* Rotation handle */
+        .rotation-handle {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+            pointer-events: all;
+        }
+
+        .boat-wrapper:hover .rotation-handle {
+            opacity: 1;
+        }
+
+        .rotation-handle:hover {
+            background: #fff;
+            transform: translateX(-50%) scale(1.2);
+        }
+
+        .rotation-handle:active {
+            cursor: grabbing;
+        }
+
+        /* Updated boat sizes - G boats larger to fit 3-digit numbers */
+        /* Large boats (C-prefix) */
+        .boat-type-1 {
+            width: 30px;
+            height: 60px;
+        }
+
+        /* Small boats (G-prefix) - increased size */
+        .boat-type-2 {
+            width: 26px;
+            height: 44px;
+        }
+
+        .boat:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .boat-wrapper.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+        }
+
+        /* Boat number with background box - adjusted for G boats */
+        .boat-number {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 2px 3px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            z-index: 2;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Smaller font for G boats with 3 digits */
+        .boat-type-2 .boat-number {
+            font-size: 9px;
+            padding: 1px 2px;
+        }
+
+        .user-indicator {
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+
+        /* Boat Status Colors */
+        .status-none { background-color: #ff0000 !important; }
+        .status-platform { background-color: #ff8c00 !important; }
+        .status-pierside { background-color: #ffff00 !important; }
+        .status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                #ffffff,
+                #ffffff 3px,
+                #00ff00 3px,
+                #00ff00 6px
+            ) !important;
+        }
+        .status-operational { background-color: #00ff00 !important; }
+
+        .user-leg .user-indicator {
+            background-color: #b19cd9;
+        }
+
+        .user-lat .user-indicator {
+            background-color: #00bfff;
+        }
+
+        /* Context Menu Styles */
+        .context-menu {
+            position: fixed;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 5px 0;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .context-menu-item {
+            padding: 8px 20px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 0.9em;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(0, 191, 255, 0.2);
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: #444;
+            margin: 5px 0;
+        }
+
+        .status-indicator-menu {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls input[type="file"] {
+            padding: 8px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .controls button:hover {
+            transform: scale(1.05);
+        }
+
+        .boat-count {
+            margin-left: auto;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .instructions {
+            padding: 10px 20px;
+            background: rgba(0, 191, 255, 0.1);
+            border-radius: 5px;
+            font-size: 0.9em;
+            color: #00bfff;
+        }
+
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-areas {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            
+            .status-area {
+                flex: 1;
+                min-width: 200px;
+            }
+        }
+
+        .status-tracker {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .status-tracker h2 {
+            color: #00bfff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        th {
+            background: rgba(0, 191, 255, 0.2);
+            color: #00bfff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Update table cell styles for better visibility */
+        td {
+            color: #000 !important;
+            font-size: 0.9em;
+            line-height: 1.3;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        td small {
+            display: block;
+            font-size: 0.75em;
+            color: #333 !important;
+            margin-top: 2px;
+            font-weight: normal;
+            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Ensure all status cells have black text */
+        td[data-status] {
+            color: #000 !important;
+        }
+
+        /* Status cell colors with better contrast */
+        td.status-none { 
+            background-color: rgba(255, 0, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-platform { 
+            background-color: rgba(255, 140, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-pierside { 
+            background-color: rgba(255, 255, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.7),
+                rgba(255, 255, 255, 0.7) 5px,
+                rgba(0, 255, 0, 0.7) 5px,
+                rgba(0, 255, 0, 0.7) 10px
+            );
+            color: #000 !important;
+        }
+        td.status-operational { 
+            background-color: rgba(0, 255, 0, 0.7);
+            color: #000 !important;
+        }
+
+        .table-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .table-controls button {
+            padding: 8px 16px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .table-controls button:hover {
+            transform: scale(1.05);
+        }
+
+        .google-sheets-info {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            margin-left: 20px;
+        }
+
+        .google-sheets-info p {
+            margin-bottom: 10px;
+            color: #00bfff;
+            font-weight: bold;
+        }
+
+        .google-sheets-info ol {
+            margin-bottom: 15px;
+            padding-left: 20px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        .google-sheets-info input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+        }
+
+        /* View-only mode styles */
+        .view-only-indicator {
+            background: rgba(255, 165, 0, 0.2);
+            border: 2px solid orange;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Boat Status Display System</h1>
+            <p>Real-time monitoring of boat status and location</p>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-none"></div>
+                </div>
+                <span>No Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-platform"></div>
+                </div>
+                <span>Platform Check (Orange)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-pierside"></div>
+                </div>
+                <span>Pierside Check (Yellow)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-pretow"></div>
+                </div>
+                <span>Pre-Tow Check (Hatched)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-operational"></div>
+                </div>
+                <span>Post-Tow Check (Green)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper user-leg">
+                    <div class="legend-boat"></div>
+                    <div class="user-indicator">Leg</div>
+                </div>
+                <span>Leg (Purple)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper user-lat">
+                    <div class="legend-boat"></div>
+                    <div class="user-indicator">Lat</div>
+                </div>
+                <span>Lat (Blue)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat boat-size-large">
+                        <span class="boat-number">C</span>
+                    </div>
+                </div>
+                <span>C Boat</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat boat-size-small">
+                        <span class="boat-number">G</span>
+                    </div>
+                </div>
+                <span>G Boat</span>
+            </div>
+        </div>
+
+        <div class="main-layout">
+    <div class="pier-container">
+        <div class="pier-area" id="pierArea">
+            <!-- Boats will be dynamically added here -->
+        </div>
+    </div>
+    
+    <div class="status-areas-container">
+        <div class="status-areas">
+            <div class="status-area-container">
+                <h3>Being Towed</h3>
+                <div class="status-area" id="towArea"></div>
+            </div>
+            <div class="status-area-container">
+                <h3>In Transit</h3>
+                <div class="status-area" id="transitArea"></div>
+            </div>
+            <div class="status-area-container">
+                <h3>Operational Area</h3>
+                <div class="status-area" id="operationalArea"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <div class="controls">
+            <input type="file" id="bgImageInput" accept="image/*">
+            <button onclick="uploadBackground()">Set Background Image</button>
+            <button onclick="saveLayout()">Save Layout</button>
+            <button onclick="loadLayout()">Load Layout</button>
+            <button onclick="exportToCSV()">Export Status Log</button>
+            <button onclick="generateViewOnlyLink()">Generate View-Only Link</button>
+            <button onclick="resetStatusDisplay()" style="background: linear-gradient(45deg, #ff6b6b, #ff5252);">Reset Status Display</button>
+            <div class="boat-count">
+                Total Boats: <span id="boatCount">0</span>
+            </div>
+            <div class="instructions">
+                Drag boats to move • Hover and use rotation handle to rotate • Right-click for status menu
+            </div>
+        </div>
+
+        <div class="status-tracker">
+            <h2>Status Tracking</h2>
+            <div class="table-container">
+                <table id="statusTable">
+                    <thead>
+                        <tr>
+                            <th>Boat</th>
+                            <th>Group</th>
+                            <th>No Check</th>
+                            <th>Platform</th>
+                            <th>Pierside</th>
+                            <th>Pre-Tow</th>
+                            <th>Post-Tow</th>
+                            <th>Being Towed</th>
+                            <th>In Transit</th>
+                            <th>Op Area</th>
+                            <th>Return Pier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statusTableBody">
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-controls">
+                <button onclick="exportToCSV()">Export to CSV</button>
+                <button onclick="clearStatusTable()">Clear Table</button>
+                <div class="google-sheets-info">
+                    <p>For Google Sheets integration:</p>
+                    <ol>
+                        <li>Create a Google Sheet</li>
+                        <li>Use Tools → Script Editor</li>
+                        <li>Deploy as Web App with API endpoint</li>
+                        <li>Configure webhook URL below</li>
+                    </ol>
+                    <input type="text" id="webhookUrl" placeholder="Google Sheets webhook URL" />
+                    <button onclick="saveWebhookUrl()">Save URL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="boatContextMenu"></div>
+<script>
+    // Global variables and initialization
+    const boats = new Map();
+    const boatAssignments = new Map(); // FIXED: Added missing declaration
+    const statusLog = [];
+    let draggedBoat = null;
+    let dragShadow = null;
+    let rotatingBoat = null;
+    let resizeObserver = null;
+    const offset = { x: 0, y: 0 };
+    const rotationStart = { angle: 0, mouseAngle: 0 };
+
+    // n8n webhook configuration
+    const N8N_CONFIG = {
+        assignmentWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-assignments',
+        statusWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-status-update',
+        stateWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-state'
+    };
+    
+    // Polling interval (30 seconds)
+    const POLL_INTERVAL = 30000;
+    let pollTimer = null;
+    
+    // Check if view-only mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isViewOnly = urlParams.get('view') === 'only';
+    
+    // Function to fetch current boat state from n8n
+    async function fetchBoatState() {
+        try {
+            const response = await fetch(N8N_CONFIG.stateWebhook);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching boat state:', error);
+            return null;
+        }
+    }
+    
+    // Function to send manual movement to n8n
+    async function sendManualMovement(boatId, status, location, operator = 'Manual') {
+        try {
+            const response = await fetch(N8N_CONFIG.statusWebhook, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    boatId: boatId,
+                    status: status,
+                    location: location,
+                    operator: operator,
+                    timestamp: new Date().toISOString()
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error sending manual movement:', error);
+            throw error;
+        }
+    }
+
+    // Start polling for updates
+    function startPolling() {
+        // Initial fetch
+        updateFromServerState();
+        
+        // Set up polling
+        pollTimer = setInterval(() => {
+            updateFromServerState();
+        }, POLL_INTERVAL);
+    }
+
+    // Stop polling
+    function stopPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    // Function to maintain boat positions relative to background
+    function maintainBoatPositions() {
+        const pierArea = document.getElementById('pierArea');
+        const pierRect = pierArea.getBoundingClientRect();
+        
+        // Only update positions if we have stored relative positions
+        boats.forEach((boatData, boatId) => {
+            if (boatData.location === 'pier' && boatData.relativeX !== null && boatData.relativeY !== null) {
+                const newX = boatData.relativeX * pierRect.width;
+                const newY = boatData.relativeY * pierRect.height;
+                
+                boatData.element.style.left = newX + 'px';
+                boatData.element.style.top = newY + 'px';
+                
+                // Update stored absolute positions
+                boatData.x = newX;
+                boatData.y = newY;
+            }
+        });
+    }
+
+    // Handle rotation
+    function handleRotationStart(e, boatWrapper) {
+        e.preventDefault();
+        rotatingBoat = boatWrapper;
+        
+        const rect = boatWrapper.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Get current rotation
+        const currentRotation = boatWrapper.style.transform.match(/rotate\((\d+)deg\)/);
+        rotationStart.angle = currentRotation ? parseInt(currentRotation[1]) : 0;
+        
+        // Calculate initial mouse angle
+        rotationStart.mouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+        
+        document.addEventListener('mousemove', handleRotation);
+        document.addEventListener('mouseup', handleRotationEnd);
+    }
+
+    function handleRotation(e) {
+        if (!rotatingBoat) return;
+        
+        const rect = rotatingBoat.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Calculate current mouse angle
+        const currentMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+        
+        // Calculate rotation difference
+        const angleDiff = currentMouseAngle - rotationStart.mouseAngle;
+        
+        // Apply rotation
+        const newRotation = rotationStart.angle + angleDiff;
+        rotatingBoat.style.transform = `rotate(${newRotation}deg)`;
+        
+        // Update boat data
+        const boatId = parseInt(rotatingBoat.id.replace('boat-wrapper-', ''));
+        const boatData = boats.get(boatId);
+        if (boatData) {
+            boatData.rotation = newRotation;
+        }
+    }
+
+    function handleRotationEnd(e) {
+        document.removeEventListener('mousemove', handleRotation);
+        document.removeEventListener('mouseup', handleRotationEnd);
+        rotatingBoat = null;
+        
+        // Auto-save state
+        autoSaveState();
+    }
+
+    // Initialize with stored assignments if available
+    function loadAssignments() {
+        const stored = localStorage.getItem('boatAssignments');
+        if (stored) {
+            const assignments = JSON.parse(stored);
+            assignments.forEach(item => {
+                boatAssignments.set(item.boatId, item.userGroup);
+            });
+        }
+    }
+// Function to update display from server state - COMPLETE REWRITE
+    async function updateFromServerState() {
+        const state = await fetchBoatState();
+        if (!state || !state.boats) {
+            console.log('No boat state received from server');
+            return;
+        }
+        
+	// Initialize persistent tracking if needed
+	if (!window.persistentBoatTracking) {
+    		window.persistentBoatTracking = new Map();
+	}
+
+        // Load UI state for view-only mode AND regular mode
+        if (state.uiState) {
+            try {
+                const uiState = state.uiState;
+                
+                // Restore background
+                if (uiState.background) {
+                    const pierArea = document.getElementById('pierArea');
+                    pierArea.style.backgroundImage = uiState.background;
+                    
+                    // Restore original dimensions
+                    if (uiState.pierAreaDimensions) {
+                        pierArea.dataset.originalWidth = uiState.pierAreaDimensions.originalWidth;
+                        pierArea.dataset.originalHeight = uiState.pierAreaDimensions.originalHeight;
+                    }
+                }
+                
+                // Restore status table in view-only mode
+                if (isViewOnly && uiState.statusTable) {
+                    document.getElementById('statusTableBody').innerHTML = uiState.statusTable;
+                }
+            } catch (error) {
+                console.error('Error loading UI state:', error);
+            }
+        }
+
+        // Also load saved layout in view-only mode
+        if (isViewOnly) {
+            const saved = localStorage.getItem('boatLayout');
+            if (saved) {
+                try {
+                    const layout = JSON.parse(saved);
+                    console.log('View-only mode: Layout loaded from local storage');
+                } catch (error) {
+                    console.error('Error loading layout in view-only mode:', error);
+                }
+            }
+        }
+        
+        console.log(`Updating display with ${state.boats.length} boats from server`);
+        
+        // Track which boats we've seen
+        const serverBoatIds = new Set();
+        
+        // Initialize tracking for server updates if needed
+        if (!window.serverUpdateTracking) {
+            window.serverUpdateTracking = new Map();
+        }
+        
+        // Update or create boats from server state
+        state.boats.forEach(boatData => {
+            serverBoatIds.add(boatData.id);
+            
+            if (boats.has(boatData.id)) {
+                // UPDATE EXISTING BOAT - VISUAL ONLY
+                const existingBoat = boats.get(boatData.id);
+                
+                // Update properties
+                existingBoat.userGroup = boatData.userGroup;
+                existingBoat.location = boatData.location;
+                
+                // Determine what color to display
+                let displayStatus = boatData.status;
+                const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+                
+                if (movementStatuses.includes(boatData.status)) {
+                    // This is a movement status - keep the existing check status for color
+                    displayStatus = existingBoat.status;
+                } else {
+                    // This is a check status - update the stored status
+                    existingBoat.status = boatData.status;
+                }
+                
+                // Update visual elements ONLY
+                existingBoat.boat.className = `boat boat-type-${existingBoat.type} status-${displayStatus}`;
+                existingBoat.element.className = `boat-wrapper user-${boatData.userGroup}`;
+                existingBoat.element.querySelector('.user-indicator').textContent = 
+                    boatData.userGroup === 'leg' ? 'Leg' : 'Lat';
+                
+                // Update position if needed
+                const currentParent = existingBoat.element.parentElement;
+                const targetAreaId = boatData.location + 'Area';
+                const targetArea = document.getElementById(targetAreaId);
+                
+                if (targetArea && currentParent.id !== targetAreaId) {
+                    console.log(`Moving boat ${boatData.id} from ${currentParent.id} to ${targetAreaId}`);
+                    targetArea.appendChild(existingBoat.element);
+                    
+                    // Sort areas as needed
+                    if (boatData.location !== 'pier') {
+                        sortBoatsInArea(targetAreaId);
+                    }
+                    
+                    // Re-sort the area the boat left
+                    const oldAreaId = currentParent.id;
+                    if (oldAreaId === 'towArea' || oldAreaId === 'transitArea' || oldAreaId === 'operationalArea') {
+                        sortBoatsInArea(oldAreaId);
+                    }
+                }
+                
+                // Update stored position if boat is in pier
+                if (boatData.location === 'pier' && boatData.x !== undefined && boatData.y !== undefined) {
+                    existingBoat.x = boatData.x;
+                    existingBoat.y = boatData.y;
+                    existingBoat.rotation = boatData.rotation || 0;
+                    
+                    // Apply position
+                    existingBoat.element.style.left = boatData.x + 'px';
+                    existingBoat.element.style.top = boatData.y + 'px';
+                    existingBoat.element.style.transform = `rotate(${boatData.rotation || 0}deg)`;
+                }
+                
+                // ONLY LOG STATUS IF THIS IS A NEW UPDATE FROM N8N
+                // Check if this update has a timestamp and operator that indicates it's from a form submission
+                if (boatData.lastUpdated && boatData.operator && boatData.operator !== 'n8n Update') {
+                    const updateKey = `${boatData.id}-${boatData.status}-${boatData.lastUpdated}`;
+                    const lastTracked = window.serverUpdateTracking.get(boatData.id);
+                    
+                    if (!lastTracked || lastTracked !== updateKey) {
+                        console.log(`New status update from server: Boat ${boatData.id} to ${boatData.status} by ${boatData.operator}`);
+                        addStatusToTable(boatData.id, existingBoat, boatData.status, boatData.operator);
+                        window.serverUpdateTracking.set(boatData.id, updateKey);
+                    }
+                }
+                
+            } else {
+                // CREATE NEW BOAT
+console.log(`Creating new boat ${boatData.id} from server state`);
+
+// Check if we have a locally stored position for this boat
+const existingBoat = boats.get(boatData.id);
+let useX = boatData.x;
+let useY = boatData.y;
+let useRotation = boatData.rotation || 0;
+
+// If server doesn't have position data but we do locally, use local
+if (existingBoat && existingBoat.location === 'pier') {
+    if ((!boatData.x || boatData.x === 0) && existingBoat.x) {
+        useX = existingBoat.x;
+    }
+    if ((!boatData.y || boatData.y === 0) && existingBoat.y) {
+        useY = existingBoat.y;
+    }
+    if ((!boatData.rotation || boatData.rotation === 0) && existingBoat.rotation) {
+        useRotation = existingBoat.rotation;
+    }
+}
+
+createBoat({
+    id: boatData.id,
+    type: boatData.type,
+    userGroup: boatData.userGroup,
+    status: boatData.status,
+    x: useX || 50 + (boats.size % 12) * 50,
+    y: useY || 50 + Math.floor(boats.size / 12) * 70,
+    rotation: useRotation
+});
+
+// Get the created boat data
+const newBoat = boats.get(boatData.id);
+if (!newBoat) {
+    console.error(`Failed to create boat ${boatData.id}`);
+    return;
+}
+
+// Move to correct location if not pier
+if (boatData.location && boatData.location !== 'pier') {
+    moveBoatToArea(boatData.id, boatData.location + 'Area', true);
+}
+
+// Log initial status for new boats ONLY if truly new
+const initialKey = `${boatData.id}-initial-created`;
+if (!window.serverUpdateTracking.has(initialKey)) {
+    // Mark as created
+    window.serverUpdateTracking.set(initialKey, true);
+    
+    // Only log if has a non-none status
+    if (boatData.status && boatData.status !== 'none') {
+        const initialOperator = (boatData.operator && boatData.operator !== 'n8n Update') 
+            ? boatData.operator 
+            : 'Initial';
+        
+        console.log(`Logging initial status for new boat ${boatData.id} with operator ${initialOperator}`);
+        addStatusToTable(boatData.id, newBoat, boatData.status, initialOperator);
+    }
+}
+	    }
+        });
+        
+        // Remove boats that don't exist on server
+        const boatsToRemove = [];
+        boats.forEach((data, id) => {
+            if (!serverBoatIds.has(id)) {
+                boatsToRemove.push(id);
+            }
+        });
+        
+        boatsToRemove.forEach(id => {
+            console.log(`Removing boat ${id} - no longer on server`);
+            const boatData = boats.get(id);
+            if (boatData && boatData.element) {
+                boatData.element.remove();
+            }
+            boats.delete(id);
+            
+            // Clean up tracking
+            window.serverUpdateTracking.delete(id);
+            window.serverUpdateTracking.delete(`${id}-initial`);
+        });
+        
+        updateBoatCount();
+    }
+
+    // Context Menu Functions
+    function createContextMenu() {
+        // Create menu element (already in HTML)
+        const menu = document.getElementById('boatContextMenu');
+        
+        // Close menu when clicking elsewhere
+        document.addEventListener('click', function() {
+            menu.style.display = 'none';
+        });
+    }
+
+    function showContextMenu(e, boatId) {
+        if (isViewOnly) return;
+        
+        const menu = document.getElementById('boatContextMenu');
+        const boatData = boats.get(boatId);
+        
+        if (!boatData) return;
+        
+        // Build menu content
+        menu.innerHTML = `
+            <div class="context-menu-item" style="font-weight: bold; color: #00bfff;">
+                ${boatData.type === 1 ? 'C' : 'G'}${boatId.toString().padStart(2, '0')} - Status Update
+            </div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'none')">
+                <span class="status-indicator-menu status-none"></span>
+                No Check
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform')">
+                <span class="status-indicator-menu status-platform"></span>
+                Platform Check
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside')">
+                <span class="status-indicator-menu status-pierside"></span>
+                Pierside Check
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow')">
+                <span class="status-indicator-menu status-pretow"></span>
+                Pre-Tow Check
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational')">
+                <span class="status-indicator-menu status-operational"></span>
+                Post-Tow Check
+            </div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'tow')">
+                Being Towed
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'transit')">
+                In Transit
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational-area')">
+                Operational Area
+            </div>
+            <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'return-pier')">
+                Return to Pier
+            </div>
+        `;
+        
+        // Position menu
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        menu.style.display = 'block';
+        
+        // Prevent menu from going off-screen
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = (e.pageX - rect.width) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = (e.pageY - rect.height) + 'px';
+        }
+    }
+
+    function updateBoatStatusFromMenu(boatId, newStatus) {
+        const menu = document.getElementById('boatContextMenu');
+        menu.style.display = 'none';
+        
+        // Get operator name
+        const operator = prompt('Enter your name:', localStorage.getItem('boatOperatorName') || 'Manual');
+        if (operator) {
+            localStorage.setItem('boatOperatorName', operator);
+            const boatData = boats.get(boatId);
+            updateBoatStatus(boatId, newStatus, operator);
+            
+            // Send to n8n with operator name
+            sendManualMovement(boatId, newStatus, boatData.location, operator).catch(error => {
+                console.error('Failed to send manual update to server:', error);
+                // Show user-friendly error
+                alert('Failed to send update to server. Please check your connection and try again.');
+            });
+
+            // Mark this as a recent manual update to prevent echo
+            if (!window.recentManualUpdates) {
+                window.recentManualUpdates = new Map();
+            }
+            const manualKey = `${boatId}-${newStatus}`;
+            window.recentManualUpdates.set(manualKey, {
+                time: new Date(),
+                operator: operator
+            });
+
+            // Clear after 60 seconds
+            setTimeout(() => {
+                window.recentManualUpdates.delete(manualKey);
+            }, 60000);
+        }
+    }
+
+function createBoat(config) {
+    console.log('Creating boat:', config);
+    
+    // CRITICAL: Check if boat already exists and preserve its position
+    const existingBoatData = boats.get(config.id);
+    if (existingBoatData && existingBoatData.location === 'pier') {
+        // Preserve existing pier position if no new position provided
+        if (!config.x || config.x === 50 + (boats.size % 12) * 50) {
+            config.x = existingBoatData.x;
+        }
+        if (!config.y || config.y === 50 + Math.floor(boats.size / 12) * 70) {
+            config.y = existingBoatData.y;
+        }
+        if (config.rotation === 0 && existingBoatData.rotation !== 0) {
+            config.rotation = existingBoatData.rotation;
+        }
+    }
+    
+    // Create wrapper for boat
+    const wrapper = document.createElement('div');
+    wrapper.className = `boat-wrapper user-${config.userGroup}`;
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = config.x + 'px';
+    wrapper.style.top = config.y + 'px';
+    wrapper.style.transform = `rotate(${config.rotation || 0}deg)`;
+    // Updated wrapper sizes for new boat dimensions
+    wrapper.style.width = config.type === 1 ? '34px' : '30px'; // G boats now 30px wide
+    wrapper.style.height = config.type === 1 ? '64px' : '48px'; // G boats now 48px tall
+    wrapper.id = `boat-wrapper-${config.id}`;
+    wrapper.draggable = !isViewOnly;
+    
+    // Create outline
+    const outline = document.createElement('div');
+    outline.className = 'boat-outline';
+    
+    const boat = document.createElement('div');
+    boat.className = `boat boat-type-${config.type} status-${config.status}`;
+    boat.id = `boat-${config.id}`;
+    boat.style.position = 'relative';
+    boat.style.width = config.type === 1 ? '30px' : '26px'; // Updated G boat width
+    boat.style.height = config.type === 1 ? '60px' : '44px'; // Updated G boat height
+    boat.style.top = '2px';
+    boat.style.left = '2px';
+    boat.style.zIndex = '1';
+    
+    // Add prefix based on boat type
+    const prefix = config.type === 1 ? 'C' : 'G';
+    const paddedNumber = config.id.toString().padStart(2, '0');
+    
+    // Create boat number with background
+    const boatNumber = document.createElement('span');
+    boatNumber.className = 'boat-number';
+    boatNumber.textContent = `${prefix}${paddedNumber}`;
+    boat.appendChild(boatNumber);
+    
+    // Create user indicator
+    const userIndicator = document.createElement('div');
+    userIndicator.className = 'user-indicator';
+    userIndicator.textContent = config.userGroup === 'leg' ? 'Leg' : 'Lat';
+    userIndicator.style.zIndex = '3';
+    
+    // Create rotation handle
+    const rotationHandle = document.createElement('div');
+    rotationHandle.className = 'rotation-handle';
+    rotationHandle.style.zIndex = '4';
+    rotationHandle.title = 'Click and drag to rotate';
+    
+    // Position rotation handle relative to boat size
+    if (config.type === 2) {
+        rotationHandle.style.top = '-12px';
+    }
+    
+    // Hide rotation handle in view-only mode
+    if (isViewOnly) {
+        rotationHandle.style.display = 'none';
+    }
+    
+    // Assemble elements
+    wrapper.appendChild(outline);
+    wrapper.appendChild(boat);
+    wrapper.appendChild(userIndicator);
+    wrapper.appendChild(rotationHandle);
+    
+    // Add drag event listeners to wrapper (if not view-only)
+    if (!isViewOnly) {
+        wrapper.addEventListener('dragstart', handleDragStart);
+        wrapper.addEventListener('dragend', handleDragEnd);
+        
+        // Add rotation functionality
+        rotationHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); // Prevent drag from starting
+            handleRotationStart(e, wrapper);
+        });
+        
+        // Add context menu
+        wrapper.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            showContextMenu(e, config.id);
+        });
+    }
+    
+    // Add to pier area by default with proper spacing
+    const pierArea = document.getElementById('pierArea');
+    const existingBoats = pierArea.querySelectorAll('.boat-wrapper').length;
+
+    // Calculate position based on existing boats
+    if (!config.x || !config.y) {
+        config.x = 50 + (existingBoats % 12) * 50;
+        config.y = 50 + Math.floor(existingBoats / 12) * 70;
+    }
+
+    // Update wrapper position BEFORE adding to pier area
+    wrapper.style.left = config.x + 'px';
+    wrapper.style.top = config.y + 'px';
+
+    // Add boat to pier area
+    pierArea.appendChild(wrapper);
+    
+    // Store boat data with proper position tracking
+    const boatData = {
+        element: wrapper,
+        boat: boat,
+        type: config.type,
+        userGroup: config.userGroup,
+        status: config.status,
+        location: 'pier',
+        x: config.x,
+        y: config.y,
+        rotation: config.rotation || 0,
+        relativeX: null,
+        relativeY: null
+    };
+
+    // Calculate relative positions if background exists
+    if (pierArea.style.backgroundImage) {
+        const pierRect = pierArea.getBoundingClientRect();
+        boatData.relativeX = config.x / pierRect.width;
+        boatData.relativeY = config.y / pierRect.height;
+    }
+
+    boats.set(config.id, boatData);
+    
+    console.log('Boat created successfully, total boats:', boats.size);
+    updateBoatCount();
+}
+
+    function handleDragStart(e) {
+        if (isViewOnly) return;
+        
+        draggedBoat = e.target.closest('.boat-wrapper');
+        if (!draggedBoat) return;
+        
+        draggedBoat.classList.add('dragging');
+        
+        const rect = draggedBoat.getBoundingClientRect();
+        offset.x = e.clientX - rect.left;
+        offset.y = e.clientY - rect.top;
+        
+        e.dataTransfer.effectAllowed = 'move';
+        
+        // Hide the default drag image
+        const emptyImg = new Image();
+        emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
+        e.dataTransfer.setDragImage(emptyImg, 0, 0);
+        
+        // Create drag shadow
+        createDragShadow(e);
+    }
+    
+    function createDragShadow(e) {
+        // Create a clone of the dragged boat
+        dragShadow = draggedBoat.cloneNode(true);
+        dragShadow.style.position = 'fixed';
+        dragShadow.style.pointerEvents = 'none';
+        dragShadow.style.opacity = '0.6';
+        dragShadow.style.zIndex = '9999';
+        dragShadow.classList.add('drag-shadow');
+        
+        // Position at mouse
+        dragShadow.style.left = (e.clientX - offset.x) + 'px';
+        dragShadow.style.top = (e.clientY - offset.y) + 'px';
+        
+        document.body.appendChild(dragShadow);
+        
+        // Update shadow position on mouse move
+        document.addEventListener('dragover', updateDragShadow);
+    }
+    
+    function updateDragShadow(e) {
+        if (dragShadow) {
+            dragShadow.style.left = (e.clientX - offset.x) + 'px';
+            dragShadow.style.top = (e.clientY - offset.y) + 'px';
+        }
+    }
+    
+    function removeDragShadow() {
+        if (dragShadow) {
+            document.removeEventListener('dragover', updateDragShadow);
+            dragShadow.remove();
+            dragShadow = null;
+        }
+    }
+
+    function handleDragEnd(e) {
+        if (draggedBoat) {
+            draggedBoat.classList.remove('dragging');
+            draggedBoat = null;
+        }
+        removeDragShadow();
+    }
+
+    // Constrain boat position within container - updated for new G boat sizes
+    function constrainPosition(boat, container, x, y) {
+        const boatWrapper = boat.closest('.boat-wrapper');
+        const boatType = boatWrapper.querySelector('.boat-type-1') ? 1 : 2;
+        const boatWidth = boatType === 1 ? 34 : 30; // Updated G boat width
+        const boatHeight = boatType === 1 ? 64 : 48; // Updated G boat height
+        const containerRect = container.getBoundingClientRect();
+        
+        const maxX = containerRect.width - boatWidth;
+        const maxY = containerRect.height - boatHeight;
+        
+        return {
+            x: Math.max(3, Math.min(x, maxX)),
+            y: Math.max(3, Math.min(y, maxY))
+        };
+    }
+// FIXED addStatusToTable function - completely rewritten to prevent duplicates
+    function addStatusToTable(boatId, boatData, status, operator) {
+        // Enhanced duplicate prevention with multiple checks
+        const timestamp = new Date();
+        const timeStr = timestamp.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+        });
+        
+        // Create multiple keys to check for duplicates
+        const updateKey = `${boatId}-${status}-${operator}-${timeStr}`;
+        const recentKey = `${boatId}-${status}-recent`;
+        
+        // Initialize tracking objects if needed
+        if (!window.processedUpdates) {
+            window.processedUpdates = new Set();
+        }
+        if (!window.recentUpdates) {
+            window.recentUpdates = new Map();
+        }
+        
+        // Check if this exact update was already processed
+        if (window.processedUpdates.has(updateKey)) {
+            console.log(`Duplicate update ignored (exact match): ${updateKey}`);
+            return;
+        }
+        
+        // Check if a similar update happened very recently (within 2 seconds)
+        const lastUpdate = window.recentUpdates.get(recentKey);
+        if (lastUpdate) {
+            const timeDiff = timestamp - lastUpdate.time;
+            if (timeDiff < 2000 && lastUpdate.operator === operator) {
+                console.log(`Duplicate update ignored (too recent): ${recentKey}`);
+                return;
+            }
+        }
+
+        // Additional check: prevent duplicate entries from same operator within same minute
+        const minuteKey = `${boatId}-${status}-${operator}-${timeStr.substring(0, 5)}`; // HH:MM only
+        if (window.processedUpdates.has(minuteKey)) {
+            console.log(`Duplicate within same minute ignored: ${minuteKey}`);
+            return;
+        }
+        window.processedUpdates.add(minuteKey);
+        
+        // Record this update
+        window.processedUpdates.add(updateKey);
+        window.recentUpdates.set(recentKey, { time: timestamp, operator: operator });
+        
+        // Clean up old entries after 10 seconds
+        setTimeout(() => {
+            window.processedUpdates.delete(updateKey);
+            window.processedUpdates.delete(minuteKey);
+            window.recentUpdates.delete(recentKey);
+        }, 10000);
+
+        const tbody = document.getElementById('statusTableBody');
+        const prefix = boatData.type === 1 ? 'C' : 'G';
+        const paddedNumber = boatId.toString().padStart(2, '0');
+        const boatName = `${prefix}${paddedNumber}`;
+        
+        // Map status names for movement statuses
+        const statusColumnMap = {
+            'none': 'none',
+            'platform': 'platform',
+            'pierside': 'pierside',
+            'pretow': 'pretow',
+            'operational': 'operational',
+            'tow': 'tow',
+            'transit': 'transit',
+            'operational-area': 'oparea',
+            'return-pier': 'return'
+        };
+        
+        const columnStatus = statusColumnMap[status] || status;
+        
+        // Find the most recent row for this boat
+        const existingRows = Array.from(tbody.querySelectorAll(`tr[data-boat-id="${boatId}"]`));
+        let targetRow = null;
+        
+        if (existingRows.length === 0) {
+            // No rows exist - create the first one
+            targetRow = createNewRow(boatId, boatName, boatData);
+            tbody.insertBefore(targetRow, tbody.firstChild);
+        } else {
+            // Get the most recent row (last in array)
+            const mostRecentRow = existingRows[existingRows.length - 1];
+            const statusCell = mostRecentRow.querySelector(`td[data-status="${columnStatus}"]`);
+            
+            // Check if this specific status cell is empty
+            if (statusCell && statusCell.innerHTML.trim() === '') {
+                // Use this row
+                targetRow = mostRecentRow;
+            } else {
+                // Status already filled - need a new row
+                targetRow = createNewRow(boatId, boatName, boatData);
+                // Insert after the most recent row
+                mostRecentRow.parentNode.insertBefore(targetRow, mostRecentRow.nextSibling);
+            }
+        }
+        
+        // Update the status cell
+        if (targetRow) {
+            const statusCell = targetRow.querySelector(`td[data-status="${columnStatus}"]`);
+            if (statusCell && statusCell.innerHTML.trim() === '') {
+                // Determine color based on status type
+                let colorStatus = status;
+                if (status === 'tow' || status === 'transit' || status === 'operational-area' || status === 'return-pier') {
+                    // For movement statuses, use the boat's check status for color
+                    colorStatus = boatData.status;
+                }
+                
+                statusCell.className = `status-${colorStatus}`;
+                statusCell.innerHTML = `${timeStr}<br><small>${operator}</small>`;
+                statusCell.title = `${timestamp.toLocaleString()} - ${operator}`;
+                
+                console.log(`Status recorded: ${boatName} - ${status} at ${timeStr} by ${operator}`);
+            }
+        }
+    }
+
+    // Helper function to create a new row
+    function createNewRow(boatId, boatName, boatData) {
+        const newRow = document.createElement('tr');
+        newRow.setAttribute('data-boat-id', boatId);
+        
+        // Boat
+        const boatCell = document.createElement('td');
+        boatCell.textContent = boatName;
+        newRow.appendChild(boatCell);
+        
+        // Group
+        const groupCell = document.createElement('td');
+        groupCell.textContent = boatData.userGroup === 'leg' ? 'Leg' : 'Lat';
+        groupCell.style.color = boatData.userGroup === 'leg' ? '#b19cd9' : '#00bfff';
+        newRow.appendChild(groupCell);
+        
+        // Status cells (including movement statuses)
+        const statuses = ['none', 'platform', 'pierside', 'pretow', 'operational', 'tow', 'transit', 'oparea', 'return'];
+        statuses.forEach(s => {
+            const cell = document.createElement('td');
+            cell.setAttribute('data-status', s);
+            newRow.appendChild(cell);
+        });
+        
+        return newRow;
+    }
+
+    // Update boat status
+    function updateBoatStatus(boatId, newStatus, operator = 'Unknown') {
+        const boatData = boats.get(boatId);
+        if (boatData) {
+            const oldStatus = boatData.status;
+            
+            // Add to status tracking table for all statuses
+            addStatusToTable(boatId, boatData, newStatus, operator);
+            
+            // Determine if this is a movement status or check status
+            const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+            const isMovementStatus = movementStatuses.includes(newStatus);
+
+            if (isMovementStatus) {
+                // Handle movement statuses
+                if (newStatus === 'tow') {
+                    moveBoatToArea(boatId, 'towArea', true);
+                } else if (newStatus === 'transit') {
+                    moveBoatToArea(boatId, 'transitArea', true);
+                } else if (newStatus === 'operational-area') {
+                    moveBoatToArea(boatId, 'operationalArea', true);
+                } else if (newStatus === 'return-pier') {
+                    // Only move to pier if not already there
+                    if (boatData.location !== 'pier') {
+                        moveBoatToArea(boatId, 'pierArea', false);
+                    }
+                }
+            } else {
+                // Handle check statuses - ONLY update color, NEVER move
+                // Store current position to ensure no movement
+                const currentX = boatData.element.style.left;
+                const currentY = boatData.element.style.top;
+                const currentTransform = boatData.element.style.transform;
+                
+                // Update only the visual status
+                boatData.status = newStatus;
+                boatData.boat.className = `boat boat-type-${boatData.type} status-${newStatus}`;
+                
+                // Force position to stay the same
+                boatData.element.style.left = currentX;
+                boatData.element.style.top = currentY;
+                boatData.element.style.transform = currentTransform;
+                
+                console.log(`Check status changed to ${newStatus}, boat forced to remain at ${currentX}, ${currentY} in ${boatData.location}`);
+            }	
+            
+            // Log the status change
+            statusLog.push({
+                boatId: boatId,
+                boatType: boatData.type === 1 ? 'C' : 'G',
+                userGroup: boatData.userGroup,
+                oldStatus: oldStatus,
+                newStatus: newStatus,
+                timestamp: new Date().toISOString(),
+                location: boatData.location,
+                operator: operator
+            });
+            
+            // Send to Google Sheets if configured
+            sendToGoogleSheets(boatId, boatData, newStatus, operator);
+            
+            // Auto-save state after update
+            autoSaveState();
+        }
+    }
+function moveBoatToArea(boatId, areaId, sort = false) {
+        const boatData = boats.get(boatId);
+        if (boatData) {
+            // CRITICAL: If boat is already in the target area, don't move it!
+            const currentAreaId = boatData.location + 'Area';
+            if (currentAreaId === areaId) {
+                console.log(`Boat ${boatId} already in ${areaId}, not moving`);
+                return; // Don't move if already there
+            }
+            
+            const area = document.getElementById(areaId);
+            if (!area) {
+                console.error(`Target area ${areaId} not found`);
+                return;
+            }
+            
+            const oldParent = boatData.element.parentElement;
+            const oldParentId = oldParent.id;
+            area.appendChild(boatData.element);
+            
+            boatData.location = areaId.replace('Area', '');
+	             
+            // Re-sort the area the boat left if it was a status area
+            if (oldParentId === 'towArea' || oldParentId === 'transitArea' || oldParentId === 'operationalArea') {
+                setTimeout(() => sortBoatsInArea(oldParentId), 50);
+            }
+            
+            // If sorting is enabled and it's one of the status areas
+            if (sort && (areaId === 'towArea' || areaId === 'transitArea' || areaId === 'operationalArea')) {
+                // Disable rotation handle
+                const rotHandle = boatData.element.querySelector('.rotation-handle');
+                if (rotHandle) {
+                    rotHandle.style.display = 'none';
+                }
+                // Force immediate sort
+                setTimeout(() => {
+                    sortBoatsInArea(areaId);
+                }, 100);
+            } else if (areaId === 'pierArea') {
+                // Re-enable rotation handle (if not view-only)
+                if (!isViewOnly) {
+                    const rotHandle = boatData.element.querySelector('.rotation-handle');
+                    if (rotHandle) {
+                        rotHandle.style.display = '';
+                    }
+                }
+                // Position boat in an open spot in pier with smaller spacing
+                const existingBoats = area.querySelectorAll('.boat-wrapper').length - 1;
+                const startX = 50 + (existingBoats % 12) * 50; // More boats per row with smaller spacing
+                const startY = 50 + Math.floor(existingBoats / 12) * 70;
+                
+                boatData.element.style.left = startX + 'px';
+                boatData.element.style.top = startY + 'px';
+                // Keep existing rotation when returning to pier
+
+                // Update relative positions
+                const pierRect = area.getBoundingClientRect();
+                boatData.relativeX = startX / pierRect.width;
+                boatData.relativeY = startY / pierRect.height;
+            } else {
+                // Position boat temporarily - will be repositioned by sort
+                boatData.element.style.left = '10px';
+                boatData.element.style.top = '10px';
+                boatData.element.style.transform = 'rotate(0deg)';
+            }
+            
+            // Update position in boat data
+            boatData.x = parseFloat(boatData.element.style.left);
+            boatData.y = parseFloat(boatData.element.style.top);
+            if (areaId !== 'pierArea') {
+                boatData.rotation = 0;
+            }
+        }
+    }
+
+    // Sort boats in area by group then number with proper spacing - updated for new G boat sizes
+    function sortBoatsInArea(areaId) {
+        const area = document.getElementById(areaId);
+        if (!area) return;
+        
+        const boatsInArea = Array.from(area.querySelectorAll('.boat-wrapper'));
+        console.log(`Sorting ${boatsInArea.length} boats in ${areaId}`);
+        
+        // Sort boats by group (lat first) then by ID number
+        boatsInArea.sort((a, b) => {
+            const idA = parseInt(a.id.replace('boat-wrapper-', ''));
+            const idB = parseInt(b.id.replace('boat-wrapper-', ''));
+            const boatA = boats.get(idA);
+            const boatB = boats.get(idB);
+            
+            if (!boatA || !boatB) return 0;
+            
+            // Sort by group first (lat before leg)
+            if (boatA.userGroup !== boatB.userGroup) {
+                return boatA.userGroup === 'lat' ? -1 : 1;
+            }
+            
+            // Then by boat number
+            return idA - idB;
+        });
+        
+        // Calculate proper spacing for boats - updated for new G boat sizes
+        const areaWidth = 400; // Fixed width for status areas
+        const padding = 15; // Area padding
+        const availableWidth = areaWidth - (2 * padding);
+        
+        // Boat dimensions with extra spacing (adjusted for new sizes)
+        const largeBoatWidth = 34 + 10; // 34px boat + 10px spacing
+        const smallBoatWidth = 30 + 10; // 30px boat + 10px spacing (new G boat width)
+        const boatHeight = 64 + 15; // Use large boat height + 15px spacing
+        
+        // Calculate columns based on largest boat
+        const maxColumns = Math.floor(availableWidth / largeBoatWidth);
+        const columns = Math.max(1, Math.min(maxColumns, 8)); // Max 8 columns
+        
+        // Reposition all boats in sorted order - LEFT JUSTIFIED
+        boatsInArea.forEach((boatElement, index) => {
+            const row = Math.floor(index / columns);
+            const col = index % columns;
+            
+            // Left justify - no centering
+            const x = padding + (col * largeBoatWidth);
+            const y = padding + (row * boatHeight);
+            
+            boatElement.style.left = x + 'px';
+            boatElement.style.top = y + 'px';
+            boatElement.style.transform = 'rotate(0deg)';
+            
+            // Update boat data
+            const boatId = parseInt(boatElement.id.replace('boat-wrapper-', ''));
+            const boatData = boats.get(boatId);
+            if (boatData) {
+                boatData.x = x;
+                boatData.y = y;
+                boatData.rotation = 0;
+            }
+        });
+        
+        // Calculate required height and set it
+        const rows = Math.ceil(boatsInArea.length / columns);
+        const requiredHeight = Math.max(120, (rows * boatHeight) + (2 * padding) + 20); // Min 120px, extra 20px buffer
+        
+        // Force the area to expand using direct style manipulation
+        area.style.cssText = area.style.cssText + `; height: ${requiredHeight}px !important; min-height: ${requiredHeight}px !important;`;
+        
+        // Also ensure parent container expands
+        const container = area.parentElement;
+        if (container && container.classList.contains('status-area-container')) {
+            const containerHeight = requiredHeight + 40; // Account for title
+            container.style.cssText = container.style.cssText + `; min-height: ${containerHeight}px !important;`;
+        }
+        
+        console.log(`Area ${areaId} forcefully resized to ${requiredHeight}px for ${rows} rows`);
+    }
+// Add drop zones
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropZones = ['pierArea', 'towArea', 'transitArea', 'operationalArea'];
+        
+        dropZones.forEach(zoneId => {
+            const zone = document.getElementById(zoneId);
+            
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (draggedBoat) {
+                    const rect = zone.getBoundingClientRect();
+                    const x = e.clientX - rect.left - offset.x;
+                    const y = e.clientY - rect.top - offset.y;
+                    
+                    // If dropping in pier area, allow free positioning
+                    if (zoneId === 'pierArea') {
+                        const constrained = constrainPosition(draggedBoat, zone, x, y);
+                        draggedBoat.style.left = constrained.x + 'px';
+                        draggedBoat.style.top = constrained.y + 'px';
+                    }               
+
+                    const oldParent = draggedBoat.parentElement;
+                    const oldParentId = oldParent.id;
+                    
+                    if (oldParent !== zone) {
+                        zone.appendChild(draggedBoat);
+                        
+                        // Sort if moving to a status area
+                        if (zoneId === 'towArea' || zoneId === 'transitArea' || zoneId === 'operationalArea') {
+                            setTimeout(() => sortBoatsInArea(zoneId), 50);
+                        }
+                        
+                        // Re-sort the area the boat left
+                        if (oldParentId === 'towArea' || oldParentId === 'transitArea' || oldParentId === 'operationalArea') {
+                            setTimeout(() => sortBoatsInArea(oldParentId), 100);
+                        }
+                    }
+                    
+                    // Update boat location
+                    const boatId = parseInt(draggedBoat.id.replace('boat-wrapper-', ''));
+                    const boatData = boats.get(boatId);
+                    if (boatData) {
+                        boatData.location = zoneId.replace('Area', '');
+                        boatData.x = parseFloat(draggedBoat.style.left);
+                        boatData.y = parseFloat(draggedBoat.style.top);
+    
+                        // Update relative position when boat is dropped in pier
+                        if (zoneId === 'pierArea') {
+                            const pierRect = zone.getBoundingClientRect();
+                            boatData.relativeX = boatData.x / pierRect.width;
+                            boatData.relativeY = boatData.y / pierRect.height;
+                        }
+
+			// Save position to server after manual placement in pier
+if (zoneId === 'pierArea') {
+    fetch(N8N_CONFIG.statusWebhook, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            type: 'positionUpdate',
+            boatId: boatId,
+            x: boatData.x,
+            y: boatData.y,
+            rotation: boatData.rotation,
+            timestamp: new Date().toISOString()
+        })
+    }).catch(err => console.log('Failed to save position to server:', err));
+}
+                        
+                        // If manually moved to a movement area, log it
+                        if (zoneId === 'towArea' || zoneId === 'transitArea' || zoneId === 'operationalArea') {
+                            let newStatus = '';
+                            if (zoneId === 'towArea') newStatus = 'tow';
+                            else if (zoneId === 'transitArea') newStatus = 'transit';
+                            else if (zoneId === 'operationalArea') newStatus = 'operational-area';
+                            
+                            if (newStatus) {
+                                // Log this manual movement
+                                addStatusToTable(boatId, boatData, newStatus, 'Manual');
+                                
+                                // Log the status change
+                                statusLog.push({
+                                    boatId: boatId,
+                                    boatType: boatData.type === 1 ? 'C' : 'G',
+                                    userGroup: boatData.userGroup,
+                                    oldStatus: boatData.status,
+                                    newStatus: newStatus,
+                                    timestamp: new Date().toISOString(),
+                                    location: boatData.location,
+                                    operator: 'Manual'
+                                });
+                                
+                                // Send to Google Sheets if configured
+                                sendToGoogleSheets(boatId, boatData, newStatus, 'Manual');
+
+                                // Send to n8n
+                                sendManualMovement(boatId, newStatus, boatData.location).catch(error => {
+                                    console.error('Failed to send manual movement to server:', error);
+                                });
+                            }
+                        }
+                        
+                        // Auto-save state
+                        autoSaveState();
+                    }
+                }
+            });
+        });
+        
+        // Create context menu
+        createContextMenu();
+        
+        // Enable view-only mode if needed
+        if (isViewOnly) {
+            enableViewOnlyMode();
+        }
+        
+        loadAssignments();
+        
+        // Load auto-saved state
+        loadAutoSavedState();
+        
+        updateBoatCount();
+        
+        // Set up resize observer for pier area
+        resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.target.id === 'pierArea') {
+                    maintainBoatPositions();
+                }
+            }
+        });
+        resizeObserver.observe(document.getElementById('pierArea'));
+        
+        // Start polling for updates from n8n
+        startPolling();
+
+        console.log('✅ Boat Status Display ready and polling for updates');
+
+        // Stop polling when page is hidden, restart when visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                startPolling();
+            }
+        });
+    }); // This closes the DOMContentLoaded event listener
+// Send update to Google Sheets
+    function sendToGoogleSheets(boatId, boatData, status, operator) {
+        const webhookUrl = localStorage.getItem('googleSheetsWebhook');
+        if (webhookUrl) {
+            const prefix = boatData.type === 1 ? 'C' : 'G';
+            const data = {
+                timestamp: new Date().toISOString(),
+                boat: `${prefix}${boatId.toString().padStart(2, '0')}`,
+                group: boatData.userGroup === 'leg' ? 'Leg' : 'Lat',
+                status: status,
+                location: boatData.location,
+                operator: operator
+            };
+            
+            // Send via fetch (CORS must be enabled on Google Apps Script)
+            fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            }).catch(err => console.log('Google Sheets update failed:', err));
+        }
+    }
+
+    // Export table to CSV
+    function exportToCSV() {
+        const table = document.getElementById('statusTable');
+        let csv = [];
+        
+        // Headers
+        const headers = [];
+        for (let i = 0; i < table.rows[0].cells.length; i++) {
+            headers.push(table.rows[0].cells[i].textContent);
+        }
+        csv.push(headers.join(','));
+        
+        // Data rows
+        for (let i = 1; i < table.rows.length; i++) {
+            const row = [];
+            for (let j = 0; j < table.rows[i].cells.length; j++) {
+                const cell = table.rows[i].cells[j];
+                // Extract text without HTML tags
+                const text = cell.textContent.replace(/\n/g, ' ').trim();
+                // Wrap in quotes if contains comma
+                row.push(text.includes(',') ? `"${text}"` : text);
+            }
+            csv.push(row.join(','));
+        }
+        
+        // Download
+        const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `boat_status_tracking_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Clear status table
+    function clearStatusTable() {
+        if (confirm('Are you sure you want to clear the status tracking table?')) {
+            document.getElementById('statusTableBody').innerHTML = '';
+        }
+    }
+
+    // Save webhook URL
+    function saveWebhookUrl() {
+        const url = document.getElementById('webhookUrl').value;
+        if (url) {
+            localStorage.setItem('googleSheetsWebhook', url);
+            alert('Google Sheets webhook URL saved!');
+        }
+    }
+
+    // Load webhook URL on startup
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedUrl = localStorage.getItem('googleSheetsWebhook');
+        if (savedUrl) {
+            document.getElementById('webhookUrl').value = savedUrl;
+        }
+    });
+
+    // Control functions
+    function uploadBackground() {
+        const input = document.getElementById('bgImageInput');
+        const file = input.files[0];
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const pierArea = document.getElementById('pierArea');
+                pierArea.style.backgroundImage = `url(${e.target.result})`;
+                
+                // Store original dimensions for scaling
+                const rect = pierArea.getBoundingClientRect();
+                pierArea.dataset.originalWidth = rect.width;
+                pierArea.dataset.originalHeight = rect.height;
+                
+                autoSaveState();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function saveLayout() {
+        const layout = {
+            boats: Array.from(boats.entries()).map(([id, data]) => ({
+                id: id,
+                type: data.type,
+                userGroup: data.userGroup,
+                status: data.status,
+                location: data.location,
+                x: data.x,
+                y: data.y,
+                rotation: data.rotation || 0
+            })),
+            background: document.getElementById('pierArea').style.backgroundImage
+        };
+        
+        localStorage.setItem('boatLayout', JSON.stringify(layout));
+        alert('Layout saved successfully!');
+    }
+
+    function loadLayout() {
+        const saved = localStorage.getItem('boatLayout');
+        if (saved) {
+            const layout = JSON.parse(saved);
+            
+            // Clear existing boats
+            boats.forEach((data, id) => {
+                data.element.remove();
+            });
+            boats.clear();
+            
+            // Restore boats
+            layout.boats.forEach(boatConfig => {
+                createBoat(boatConfig);
+                if (boatConfig.location !== 'pier') {
+                    moveBoatToArea(boatConfig.id, boatConfig.location + 'Area');
+                }
+            });
+            
+            // Restore background
+            if (layout.background) {
+                document.getElementById('pierArea').style.backgroundImage = layout.background;
+            }
+            
+            updateBoatCount();
+            alert('Layout loaded successfully!');
+        }
+    }
+
+    function updateBoatCount() {
+        document.getElementById('boatCount').textContent = boats.size;
+    }
+
+    // View-only mode functions
+    function enableViewOnlyMode() {
+        // Hide controls
+        document.querySelector('.controls').style.display = 'none';
+        
+        // Disable all interactions
+        document.querySelectorAll('.boat-wrapper').forEach(boat => {
+            boat.draggable = false;
+            boat.style.cursor = 'default';
+        });
+        
+        // Add view-only indicator
+        const header = document.querySelector('.header');
+        const indicator = document.createElement('div');
+        indicator.className = 'view-only-indicator';
+        indicator.textContent = '👁️ VIEW ONLY MODE';
+        header.appendChild(indicator);
+        
+        // Disable context menu
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    function generateViewOnlyLink() {
+        const currentUrl = window.location.origin + window.location.pathname;
+        const viewOnlyUrl = currentUrl + '?view=only';
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(viewOnlyUrl).then(() => {
+            alert('View-only link copied to clipboard:\n' + viewOnlyUrl);
+        }).catch(() => {
+            prompt('View-only link:', viewOnlyUrl);
+        });
+    }
+// Auto-save functions
+    function autoSaveState() {
+        // Only save local UI state, not boat data (that's in n8n/Google Sheets)
+        const state = {
+            background: document.getElementById('pierArea').style.backgroundImage,
+            statusTable: document.getElementById('statusTableBody').innerHTML,
+            pierAreaDimensions: {
+                originalWidth: document.getElementById('pierArea').dataset.originalWidth,
+                originalHeight: document.getElementById('pierArea').dataset.originalHeight
+            }
+        };
+        
+        localStorage.setItem('boatAutoSave', JSON.stringify(state));
+        
+        // Also save to server for view-only mode
+        if (!isViewOnly) {
+            fetch(N8N_CONFIG.statusWebhook, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: 'saveUIState',
+                    state: state
+                })
+            }).catch(err => console.log('Failed to save UI state to server:', err));
+        }
+        
+        console.log('UI state auto-saved');
+    }
+    
+    // Load autosaved state
+    function loadAutoSavedState() {
+        const saved = localStorage.getItem('boatAutoSave');
+        if (saved) {
+            try {
+                const state = JSON.parse(saved);
+                
+                // Restore background
+                if (state.background) {
+                    document.getElementById('pierArea').style.backgroundImage = state.background;
+                }
+                
+                // Restore status table
+                if (state.statusTable) {
+                    document.getElementById('statusTableBody').innerHTML = state.statusTable;
+                }
+                
+                // Restore pier area dimensions
+                if (state.pierAreaDimensions) {
+                    const pierArea = document.getElementById('pierArea');
+                    pierArea.dataset.originalWidth = state.pierAreaDimensions.originalWidth;
+                    pierArea.dataset.originalHeight = state.pierAreaDimensions.originalHeight;
+                }
+                
+                console.log('UI state loaded successfully');
+            } catch (error) {
+                console.error('Error loading auto-saved state:', error);
+            }
+        }
+    }
+
+    // Fixed reset function
+    window.resetStatusDisplay = function() {
+        // First check if there's data to save
+        const hasStatusData = document.getElementById('statusTableBody').innerHTML.trim() !== '';
+        const hasGoogleSheets = localStorage.getItem('googleSheetsWebhook') !== null;
+        
+        if (hasStatusData && !hasGoogleSheets) {
+            // Show export warning
+            const exportWarning = confirm(
+                'RECOMMENDED: Export spreadsheet prior to reset.\n\n' +
+                'You have status tracking data that has not been linked to Google Sheets. ' +
+                'Would you like to export the data before resetting?\n\n' +
+                'Click OK to export first, or Cancel to proceed with reset.'
+            );
+            
+            if (exportWarning) {
+                // Export the data first
+                exportToCSV();
+                // Give user time to see the download, then ask again
+                setTimeout(() => {
+                    if (confirm('Data exported. Do you still want to reset the display?')) {
+                        performReset();
+                    }
+                }, 1000);
+                return;
+            }
+        }
+        
+        // Final confirmation
+        if (confirm('Are you sure you want to reset the entire status display? This will remove all boats, status tracking, and saved data.')) {
+            // If Google Sheets is connected, save a final copy
+            if (hasGoogleSheets && hasStatusData) {
+                sendFinalGoogleSheetsBackup();
+            }
+            performReset();
+        }
+    }
+    
+    function performReset() {
+        // Clear all boats
+        boats.forEach((data, id) => {
+            data.element.remove();
+        });
+        boats.clear();
+        
+        // Clear status log
+        statusLog.length = 0;
+        
+        // Clear status table
+        document.getElementById('statusTableBody').innerHTML = '';
+        
+        // Clear background
+        document.getElementById('pierArea').style.backgroundImage = '';
+        
+        // Clear all saved data
+        localStorage.removeItem('boatAutoSave');
+        localStorage.removeItem('boatLayout');
+        localStorage.removeItem('boatAssignments');
+        
+        // Clear boat assignments map
+        boatAssignments.clear();
+
+        // Stop polling during reset
+        stopPolling();
+
+        // Restart polling after reset
+        setTimeout(() => {
+            startPolling();
+        }, 1000);
+        
+        // Update count
+        updateBoatCount();
+        
+        alert('Status display has been reset. All data cleared.');
+    }
+    
+    function sendFinalGoogleSheetsBackup() {
+        const webhookUrl = localStorage.getItem('googleSheetsWebhook');
+        if (webhookUrl) {
+            const timestamp = new Date().toISOString();
+            const backupData = {
+                type: 'final_backup',
+                timestamp: timestamp,
+                message: 'Display reset at ' + new Date().toLocaleString(),
+                statusLog: statusLog
+            };
+            
+            // Send backup to Google Sheets
+            fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(backupData)
+            }).catch(err => console.log('Final backup failed:', err));
+        }
+    }
+
+    // Debug function to help track what's happening
+    window.debugStatusTable = function() {
+        const tbody = document.getElementById('statusTableBody');
+        const rows = tbody.querySelectorAll('tr');
+        console.log(`Total rows in table: ${rows.length}`);
+        
+        rows.forEach((row, index) => {
+            const boatId = row.getAttribute('data-boat-id');
+            const boatCell = row.querySelector('td:first-child');
+            console.log(`Row ${index + 1}: Boat ${boatCell.textContent} (ID: ${boatId})`);
+            
+            // Count filled cells
+            const statusCells = row.querySelectorAll('td[data-status]');
+            let filledCount = 0;
+            statusCells.forEach(cell => {
+                if (cell.innerHTML.trim() !== '') filledCount++;
+            });
+            console.log(`  - Filled cells: ${filledCount}/${statusCells.length}`);
+        });
+    }
+
+    // Global function references for onclick handlers
+    window.updateBoatStatusFromMenu = updateBoatStatusFromMenu;
+    window.uploadBackground = uploadBackground;
+    window.saveLayout = saveLayout;
+    window.loadLayout = loadLayout;
+    window.exportToCSV = exportToCSV;
+    window.clearStatusTable = clearStatusTable;
+    window.saveWebhookUrl = saveWebhookUrl;
+    window.generateViewOnlyLink = generateViewOnlyLink;
+    
+    // Log initialization
+    console.log('Boat Status Display System initialized');
+    console.log('View-only mode:', isViewOnly);
+    </script>
+</body>
+</html>
