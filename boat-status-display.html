@@ -1023,18 +1023,19 @@ async function updateFromServerState() {
                 return;
             }
             
-            // Move to correct location if not pier
-            if (boatData.location !== 'pier') {
-                moveBoatToArea(boatData.id, boatData.location + 'Area', true);
-            }
-            
-            // Log initial status for new boats ONCE
-            const initialKey = `${boatData.id}-initial`;
-            if (!window.serverUpdateTracking.has(initialKey)) {
-                console.log(`Logging initial status for new boat ${boatData.id}`);
-                addStatusToTable(boatData.id, newBoat, boatData.status, 'Initial');
-                window.serverUpdateTracking.set(initialKey, true);
-            }
+            // Log initial status for new boats
+    // Check if we've already logged this boat's initial status
+    const initialKey = `${boatData.id}-initial`;
+    if (!window.serverUpdateTracking.has(initialKey)) {
+        // For initial status, use the operator from the data or 'Initial'
+        const initialOperator = (boatData.operator && boatData.operator !== 'n8n Update') 
+            ? boatData.operator 
+            : 'Initial';
+        
+        console.log(`Logging initial status for new boat ${boatData.id} with operator ${initialOperator}`);
+        addStatusToTable(boatData.id, newBoat, boatData.status, initialOperator);
+        window.serverUpdateTracking.set(initialKey, true);
+    }
         }
     });
     
