@@ -786,7 +786,7 @@
             <button onclick="loadLayout()">Load Layout</button>
             <button onclick="exportToCSV()">Export Status Log</button>
             <button onclick="generateViewOnlyLink()">Generate View-Only Link</button>
-            <button onclick="resetStatusDisplay()" style="background: linear-gradient(45deg, #ff6b6b, #ff5252);">Reset Status Display</button>
+            <button onclick="window.resetStatusDisplay()" style="background: linear-gradient(45deg, #ff6b6b, #ff5252);">Reset Status Display</button>
             <div class="boat-count">
                 Total Boats: <span id="boatCount">0</span>
             </div>
@@ -2658,7 +2658,7 @@
             window.savedBoatPositions.clear();
         }
         
-        / Clear tracking data
+        // Clear tracking data
         if (window.processedUpdates) {
             window.processedUpdates.clear();
         }
