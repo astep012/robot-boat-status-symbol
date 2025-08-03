@@ -931,12 +931,23 @@ if (isViewOnly) {
             const existingBoat = boats.get(boatData.id);
             
             // Check if status changed
-            const oldStatus = existingBoat.status;
-            const oldLocation = existingBoat.location;
-            
-            // Track if status or location changed
-            const statusChanged = oldStatus !== boatData.status;
-            const locationChanged = oldLocation !== boatData.location;
+const oldStatus = existingBoat.status;
+const oldLocation = existingBoat.location;
+
+// For movement statuses, we need to check the actual check status
+let actualOldStatus = oldStatus;
+let actualNewStatus = boatData.status;
+
+// Movement statuses don't change the check status
+const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+if (movementStatuses.includes(boatData.status)) {
+    // This is a movement status, so the check status hasn't changed
+    actualNewStatus = oldStatus; // Keep the existing check status
+}
+
+// Track if status ACTUALLY changed (not just location)
+const statusChanged = actualOldStatus !== actualNewStatus;
+const locationChanged = oldLocation !== boatData.location;
             
             // For movement statuses, preserve the check status color
             let displayStatus = boatData.status;
@@ -962,12 +973,14 @@ if (isViewOnly) {
             const targetAreaId = boatData.location + 'Area';
             const targetArea = document.getElementById(targetAreaId);
             
-            if (targetArea && currentParent !== targetArea) {
-                targetArea.appendChild(existingBoat.element);
-                if (boatData.location !== 'pier') {
-                    sortBoatsInArea(targetAreaId);
-                }
-            }
+            // Only move if location actually changed AND we're not already in the right area
+if (locationChanged && targetArea && currentParent !== targetArea) {
+    console.log(`Moving boat ${boatData.id} from ${oldLocation} to ${boatData.location}`);
+    targetArea.appendChild(existingBoat.element);
+    if (boatData.location !== 'pier') {
+        sortBoatsInArea(targetAreaId);
+    }
+}
             
            // Enhanced status history tracking
 if (!existingBoat.statusHistory) {
@@ -988,7 +1001,11 @@ const timeDiff = lastLoggedTime ? (new Date(currentTime) - new Date(lastLoggedTi
 const updateSignature = `${boatData.status}-${currentOperator}-${boatData.lastUpdated || 'no-time'}`;
 const lastUpdateSignature = existingBoat.statusHistory.get('lastUpdateSignature');
 
+// Initialize shouldLog
+let shouldLog = false;
+
 // Check if this is an echo of a recent manual update
+let isManualEcho = false;
 if (window.recentManualUpdates) {
     const manualKey = `${boatData.id}-${boatData.status}`;
     const recentManual = window.recentManualUpdates.get(manualKey);
@@ -997,42 +1014,44 @@ if (window.recentManualUpdates) {
         if (timeSinceManual < 45000 && recentManual.operator === currentOperator) {
             // This is likely an echo of our manual update
             console.log(`Ignoring server echo of manual update: ${manualKey}`);
-            shouldLog = false;
+            isManualEcho = true;
         }
     }
 }
 
 // Determine if we should log this update
-let shouldLog = false;
-if (!lastLoggedStatus) {
-    // First status for this boat
-    shouldLog = true;
-} else if (lastLoggedStatus !== boatData.status) {
-    // Status actually changed
-    shouldLog = true;
-} else if (updateSignature !== lastUpdateSignature) {
-    // Different update signature (operator or timestamp changed)
-    // But only if enough time has passed
-    if (timeDiff > 60000) { // 1 minute for same status
+if (!isManualEcho) {
+    if (!lastLoggedStatus) {
+        // First status for this boat
         shouldLog = true;
-    } else if (lastLoggedOperator !== currentOperator && timeDiff > 10000) {
-        // Different operator and at least 10 seconds passed
+    } else if (lastLoggedStatus !== boatData.status) {
+        // Status actually changed
         shouldLog = true;
+    } else if (updateSignature !== lastUpdateSignature) {
+        // Different update signature (operator or timestamp changed)
+        // But only if enough time has passed
+        if (timeDiff > 60000) { // 1 minute for same status
+            shouldLog = true;
+        } else if (lastLoggedOperator !== currentOperator && timeDiff > 10000) {
+            // Different operator and at least 10 seconds passed
+            shouldLog = true;
+        }
     }
 }
 
-// Only log if status actually changed AND we should log
-if (statusChanged && shouldLog) {
+// CRITICAL FIX: Only update table if status actually changed
+// The key issue was that statusChanged wasn't being used correctly
+if (statusChanged && shouldLog && !isManualEcho) {
     console.log(`Logging status update for boat ${boatData.id}: ${boatData.status} by ${currentOperator}`);
     addStatusToTable(boatData.id, existingBoat, boatData.status, currentOperator);
     existingBoat.statusHistory.set('lastStatus', boatData.status);
     existingBoat.statusHistory.set('lastOperator', currentOperator);
     existingBoat.statusHistory.set('lastTime', currentTime);
     existingBoat.statusHistory.set('lastUpdateSignature', updateSignature);
-} else if (statusChanged) {
-    console.log(`Skipping duplicate status update for boat ${boatData.id}: ${boatData.status}`);
-}	
-                            
+} else {
+    console.log(`No table update needed for boat ${boatData.id} - statusChanged: ${statusChanged}, shouldLog: ${shouldLog}, isManualEcho: ${isManualEcho}`);
+}
+                          
         } else {
             // Create new boat
             createBoat({
@@ -1762,13 +1781,24 @@ if (isMovementStatus) {
     }
 
     function moveBoatToArea(boatId, areaId, sort = false) {
-        const boatData = boats.get(boatId);
-        if (boatData) {
-            const area = document.getElementById(areaId);
-            
-            const oldParent = boatData.element.parentElement;
-            const oldParentId = oldParent.id;
-            area.appendChild(boatData.element);
+    const boatData = boats.get(boatId);
+    if (boatData) {
+        // CRITICAL: If boat is already in the target area, don't move it!
+        const currentAreaId = boatData.location + 'Area';
+        if (currentAreaId === areaId) {
+            console.log(`Boat ${boatId} already in ${areaId}, not moving`);
+            return; // Don't move if already there
+        }
+        
+        const area = document.getElementById(areaId);
+        if (!area) {
+            console.error(`Target area ${areaId} not found`);
+            return;
+        }
+        
+        const oldParent = boatData.element.parentElement;
+        const oldParentId = oldParent.id;
+        area.appendChild(boatData.element);
             
             boatData.location = areaId.replace('Area', '');
             
