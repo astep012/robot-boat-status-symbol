@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boat Assignment Form</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2d1b69 0%, #0f3443 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            background: linear-gradient(45deg, #b19cd9, #00bfff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .instructions {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            font-size: 1.1em;
+            color: #e0e0e0;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1.1em;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #00bfff;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 191, 255, 0.3);
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .radio-option {
+            position: relative;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .radio-option:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .radio-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .radio-custom {
+            height: 24px;
+            width: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .radio-option input[type="radio"]:checked ~ .radio-custom {
+            border-color: currentColor;
+            background: currentColor;
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        .radio-custom:after {
+            content: "";
+            position: absolute;
+            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .radio-option input[type="radio"]:checked ~ .radio-custom:after {
+            display: block;
+        }
+
+        .radio-option.laguna {
+            color: #b19cd9;
+        }
+
+        .radio-option.laguna input[type="radio"]:checked ~ .label-text {
+            text-shadow: 0 0 10px #b19cd9;
+        }
+
+        .radio-option.alhambra {
+            color: #00bfff;
+        }
+
+        .radio-option.alhambra input[type="radio"]:checked ~ .label-text {
+            text-shadow: 0 0 10px #00bfff;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #b19cd9, #00bfff);
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 191, 255, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .current-assignments {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .current-assignments h3 {
+            margin-bottom: 15px;
+            color: #00bfff;
+        }
+
+        .assignment-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+        }
+
+        .assignment-item {
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            text-align: center;
+            font-size: 0.9em;
+            border: 2px solid transparent;
+        }
+
+        .assignment-item.laguna {
+            border-color: #b19cd9;
+            color: #b19cd9;
+        }
+
+        .assignment-item.alhambra {
+            border-color: #00bfff;
+            color: #00bfff;
+        }
+
+        .success-message {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            text-align: center;
+            animation: pulse 2s ease infinite;
+        }
+
+        .error-message {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 2px solid #ff0000;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        @media (max-width: 480px) {
+            .form-container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Boat Assignment</h1>
+        
+        <p class="instructions">
+            Enter boat numbers separated by spaces.
+        </p>
+
+        <form id="assignmentForm">
+            <div class="form-group">
+                <label for="boatNumbers">Boat Numbers</label>
+                <textarea 
+                    id="boatNumbers" 
+                    name="boatNumbers" 
+                    placeholder="Example: 1 5 12 23 45 67 89 101 150"
+                    required
+                ></textarea>
+            </div>
+
+            <label>Assign to Group:</label>
+            <div class="radio-group">
+                <label class="radio-option laguna">
+                    <input type="radio" name="userGroup" value="laguna" required>
+                    <span class="radio-custom"></span>
+                    <span class="label-text">Leg (Purple)</span>
+                </label>
+                
+                <label class="radio-option alhambra">
+                    <input type="radio" name="userGroup" value="alhambra" required>
+                    <span class="radio-custom"></span>
+                    <span class="label-text">Lat (Blue)</span>
+                </label>
+            </div>
+
+            <button type="submit">Assign Boats</button>
+        </form>
+
+        <div class="success-message" id="successMessage">
+            Assignments sent successfully!
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            Please check your input and try again.
+        </div>
+
+        <div class="current-assignments" id="currentAssignments">
+            <h3>Current Assignments</h3>
+            <div class="assignment-list" id="assignmentList">
+                <!-- Assignments will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store all assignments
+        const assignments = new Map();
+
+        // Load existing assignments
+        function loadAssignments() {
+            const stored = localStorage.getItem('boatAssignments');
+            if (stored) {
+                const data = JSON.parse(stored);
+                data.forEach(item => {
+                    assignments.set(item.boatId, item.userGroup);
+                });
+                updateAssignmentDisplay();
+            }
+        }
+
+        // Update assignment display
+        function updateAssignmentDisplay() {
+            const listElement = document.getElementById('assignmentList');
+            listElement.innerHTML = '';
+            
+            // Sort assignments by group (Alhambra/Lat first) then boat number
+            const sorted = Array.from(assignments.entries()).sort((a, b) => {
+                // Sort by user group first (alhambra before laguna)
+                if (a[1] !== b[1]) {
+                    return a[1] === 'alhambra' ? -1 : 1;
+                }
+                // Then by boat number
+                return a[0] - b[0];
+            });
+            
+            sorted.forEach(([boatId, userGroup]) => {
+                const item = document.createElement('div');
+                item.className = `assignment-item ${userGroup}`;
+                const prefix = boatId <= 80 ? 'C' : 'G';
+                const paddedNumber = boatId.toString().padStart(2, '0');
+                item.textContent = `${prefix}${paddedNumber} - ${userGroup === 'laguna' ? 'Leg' : 'Lat'}`;
+                listElement.appendChild(item);
+            });
+        }
+
+        // Handle form submission
+        document.getElementById('assignmentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const numbersText = document.getElementById('boatNumbers').value.trim();
+            const selectedGroup = document.querySelector('input[name="userGroup"]:checked');
+            
+            if (!numbersText || !selectedGroup) {
+                showError('Please enter boat numbers and select a group');
+                return;
+            }
+            
+            // Parse boat numbers
+            const numbers = numbersText.split(/\s+/).map(n => parseInt(n)).filter(n => !isNaN(n) && n >= 1 && n <= 160);
+            
+            if (numbers.length === 0) {
+                showError('Please enter valid boat numbers between 1 and 160');
+                return;
+            }
+            
+            // Create assignments
+            const newAssignments = [];
+            numbers.forEach(boatId => {
+                assignments.set(boatId, selectedGroup.value);
+                newAssignments.push({
+                    boatId: boatId,
+                    userGroup: selectedGroup.value
+                });
+            });
+            
+            // Save to localStorage
+            const allAssignments = Array.from(assignments.entries()).map(([boatId, userGroup]) => ({
+                boatId,
+                userGroup
+            }));
+            localStorage.setItem('boatAssignments', JSON.stringify(allAssignments));
+            
+            // Send to display
+            sendAssignmentsToDisplay(newAssignments);
+            
+            // Update display
+            updateAssignmentDisplay();
+            
+            // Show success message
+            showSuccess(`Assigned ${numbers.length} boats to ${selectedGroup.value === 'laguna' ? 'Leg (Purple)' : 'Lat (Blue)'}`);
+            
+            // Reset form
+            document.getElementById('boatNumbers').value = '';
+            document.getElementById('assignmentForm').reset();
+        });
+
+        function sendAssignmentsToDisplay(assignments) {
+            // Send to display window
+            if (window.opener || window.parent !== window) {
+                const targetWindow = window.opener || window.parent;
+                targetWindow.postMessage({
+                    type: 'boat_assignment',
+                    assignments: assignments
+                }, '*');
+            }
+            
+            // Log assignment for tracking
+            console.log('Assignments sent:', assignments);
+        }
+
+        function showSuccess(message) {
+            const successMsg = document.getElementById('successMessage');
+            successMsg.textContent = message;
+            successMsg.style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 3000);
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+            document.getElementById('successMessage').style.display = 'none';
+            
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+            }, 3000);
+        }
+
+        // Initialize on load
+        loadAssignments();
+
+        // Example quick fill buttons (for testing)
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+1 for sample Laguna boats
+            if (e.ctrlKey && e.key === '1') {
+                document.getElementById('boatNumbers').value = '1 5 10 15 20 55 60 65 70 75';
+                document.querySelector('input[value="laguna"]').checked = true;
+            }
+            // Ctrl+2 for sample Alhambra boats
+            if (e.ctrlKey && e.key === '2') {
+                document.getElementById('boatNumbers').value = '2 6 11 16 21 56 61 66 71 76';
+                document.querySelector('input[value="alhambra"]').checked = true;
+            }
+        });
+    </script>
+</body>
+</html>
