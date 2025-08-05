@@ -1,0 +1,2451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boat Status Display System v5</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow-x: auto;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Main Display Controls */
+        .display-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            align-items: center;
+        }
+
+        .display-controls label {
+            font-weight: bold;
+            color: #00bfff;
+        }
+
+        .display-controls select {
+            padding: 5px 10px;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .display-controls button {
+            padding: 5px 15px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            border: none;
+            border-radius: 3px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .display-controls button:hover {
+            transform: scale(1.05);
+        }
+
+        /* Main display area */
+        .main-display {
+            position: relative;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 10px;
+            min-height: 600px;
+            height: 600px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            cursor: default;
+        }
+
+        .main-display.draggable-area {
+            cursor: crosshair;
+        }
+
+        /* Small status boxes */
+        .status-boxes {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .status-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 10px;
+            min-width: 200px;
+            max-width: 250px;
+            flex: 1;
+        }
+
+        .status-box h3 {
+            color: #00bfff;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .status-box-content {
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Expandable for "At Pier" */
+        .status-box.expandable .status-box-content {
+            transition: max-height 0.3s ease;
+        }
+
+        .status-box.expanded .status-box-content {
+            max-height: 400px;
+        }
+
+        /* Pod styles */
+        .pod {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            padding: 3px;
+            margin: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed #666;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .pod.selected {
+            background: rgba(0, 191, 255, 0.2);
+            border-color: #00bfff;
+        }
+
+        /* Legend with pods */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.85em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Boat sizes */
+        .legend-boat-wrapper {
+            width: 16px;
+            height: 32px;
+            position: relative;
+            padding: 2px;
+            background: #fff;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            display: inline-block;
+        }
+
+        .legend-boat-wrapper.user-leg {
+            background: #b19cd9;
+        }
+
+        .legend-boat-wrapper.user-lat {
+            background: #00bfff;
+        }
+
+        .legend-boat {
+            width: 12px;
+            height: 28px;
+            position: relative;
+            overflow: visible;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ff0000;
+        }
+
+        /* Status colors */
+        .legend-boat.status-none { background-color: #ff0000 !important; }
+        .legend-boat.status-platform { background-color: #ff8c00 !important; }
+        .legend-boat.status-pierside { background-color: #ffff00 !important; }
+        .legend-boat.status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                #ffffff,
+                #ffffff 2px,
+                #00ff00 2px,
+                #00ff00 4px
+            ) !important;
+        }
+        .legend-boat.status-operational { background-color: #00ff00 !important; }
+
+        /* User indicators */
+        .legend-boat-wrapper .user-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .legend-boat-wrapper.user-leg .user-indicator {
+            background-color: #b19cd9;
+        }
+
+        .legend-boat-wrapper.user-lat .user-indicator {
+            background-color: #00bfff;
+        }
+
+        /* Boat number */
+        .legend-boat .boat-number {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 1px 2px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: bold;
+            z-index: 2;
+            white-space: nowrap;
+        }
+
+        /* Boat styles */
+        .boat {
+            position: absolute;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            overflow: visible;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            background-color: #ff0000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .boat:active {
+            cursor: grabbing;
+        }
+
+        /* Boat wrapper for outline */
+        .boat-wrapper {
+            position: absolute;
+            background: transparent;
+            display: inline-block;
+            cursor: grab;
+        }
+
+        .boat-wrapper:active {
+            cursor: grabbing;
+        }
+
+        .boat-wrapper.in-small-box {
+            position: relative !important;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .boat-outline {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: #fff;
+            clip-path: polygon(50% 0%, 85% 15%, 95% 35%, 95% 65%, 85% 85%, 75% 100%, 25% 100%, 15% 85%, 5% 65%, 5% 35%, 15% 15%);
+            z-index: 0;
+        }
+
+        .boat-wrapper.user-leg .boat-outline {
+            background: #b19cd9;
+        }
+
+        .boat-wrapper.user-lat .boat-outline {
+            background: #00bfff;
+        }
+
+        /* Rotation handle */
+        .rotation-handle {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+            pointer-events: all;
+        }
+
+        .boat-wrapper:hover .rotation-handle {
+            opacity: 1;
+        }
+
+        .rotation-handle:hover {
+            background: #fff;
+            transform: translateX(-50%) scale(1.2);
+        }
+
+        .rotation-handle:active {
+            cursor: grabbing;
+        }
+
+        /* Hide rotation handles in small boxes */
+        .boat-wrapper.in-small-box .rotation-handle {
+            display: none;
+        }
+
+        /* Boat sizes */
+        .boat-type-1 {
+            width: 30px;
+            height: 60px;
+        }
+
+        .boat-type-2 {
+            width: 26px;
+            height: 44px;
+        }
+
+        .boat:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .boat-wrapper.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+        }
+
+        .boat-number {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 2px 3px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            z-index: 2;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .boat-type-2 .boat-number {
+            font-size: 9px;
+            padding: 1px 2px;
+        }
+
+        .user-indicator {
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+
+        /* Boat Status Colors */
+        .status-none { background-color: #ff0000 !important; }
+        .status-platform { background-color: #ff8c00 !important; }
+        .status-pierside { background-color: #ffff00 !important; }
+        .status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                #ffffff,
+                #ffffff 3px,
+                #00ff00 3px,
+                #00ff00 6px
+            ) !important;
+        }
+        .status-operational { background-color: #00ff00 !important; }
+
+        .user-leg .user-indicator {
+            background-color: #b19cd9;
+        }
+
+        .user-lat .user-indicator {
+            background-color: #00bfff;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            position: fixed;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 5px 0;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .context-menu-item {
+            padding: 8px 20px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 0.9em;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(0, 191, 255, 0.2);
+        }
+
+        .context-menu-submenu {
+            position: relative;
+        }
+
+        .context-menu-submenu:hover .submenu {
+            display: block;
+        }
+
+        .submenu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            display: none;
+            min-width: 150px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: #444;
+            margin: 5px 0;
+        }
+
+        .status-indicator-menu {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        /* Status Table */
+        .status-tracker {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .status-tracker h2 {
+            color: #00bfff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        th {
+            background: rgba(0, 191, 255, 0.2);
+            color: #00bfff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            color: #000 !important;
+            font-size: 0.9em;
+            line-height: 1.3;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        td small {
+            display: block;
+            font-size: 0.75em;
+            color: #333 !important;
+            margin-top: 2px;
+            font-weight: normal;
+            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+        }
+
+        td[data-status] {
+            color: #000 !important;
+        }
+
+        /* Status cell colors with better contrast */
+        td.status-none { 
+            background-color: rgba(255, 0, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-platform { 
+            background-color: rgba(255, 140, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-pierside { 
+            background-color: rgba(255, 255, 0, 0.7);
+            color: #000 !important;
+        }
+        td.status-pretow { 
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.7),
+                rgba(255, 255, 255, 0.7) 5px,
+                rgba(0, 255, 0, 0.7) 5px,
+                rgba(0, 255, 0, 0.7) 10px
+            );
+            color: #000 !important;
+        }
+        td.status-operational { 
+            background-color: rgba(0, 255, 0, 0.7);
+            color: #000 !important;
+        }
+
+        /* Manual override styles */
+        .manual-override-input {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 3px 5px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            width: 100%;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls input[type="file"] {
+            padding: 8px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .controls button:hover {
+            transform: scale(1.05);
+        }
+
+        .boat-count {
+            margin-left: auto;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        @media (max-width: 1200px) {
+            .status-boxes {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .status-box {
+                max-width: 100%;
+                width: 100%;
+            }
+        }
+
+        /* View-only mode */
+        .view-only-indicator {
+            background: rgba(255, 165, 0, 0.2);
+            border: 2px solid orange;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Boat Status Display System v5</h1>
+            <p>Enhanced with pods, selectable main display, and manual overrides</p>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-none"></div>
+                </div>
+                <span>No Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-platform"></div>
+                </div>
+                <span>Platform Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-pierside"></div>
+                </div>
+                <span>Pierside Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-pretow"></div>
+                </div>
+                <span>Pre-Tow Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper">
+                    <div class="legend-boat status-operational"></div>
+                </div>
+                <span>Post-Tow Check</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper user-leg">
+                    <div class="legend-boat"></div>
+                    <div class="user-indicator">Leg</div>
+                </div>
+                <span>Leg</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-boat-wrapper user-lat">
+                    <div class="legend-boat"></div>
+                    <div class="user-indicator">Lat</div>
+                </div>
+                <span>Lat</span>
+            </div>
+            <div class="legend-item">
+                <span style="font-weight: bold; color: #00bfff;">📦</span>
+                <span>Pod (grouped boats)</span>
+            </div>
+        </div>
+
+        <!-- Main Display Controls -->
+        <div class="display-controls">
+            <label>Main Display:</label>
+            <select id="mainDisplaySelect">
+                <option value="pier">Pier Area</option>
+                <option value="tow">Being Towed</option>
+                <option value="transit">In Transit</option>
+                <option value="operational-area">Operational Area</option>
+            </select>
+            <button onclick="saveDisplayLayout()">Save Layout</button>
+            <button onclick="loadDisplayLayout()">Load Layout</button>
+        </div>
+
+        <!-- Main Display Area -->
+        <div class="main-display draggable-area" id="mainDisplay">
+            <!-- Boats will be dynamically displayed here -->
+        </div>
+
+        <!-- Small Status Boxes -->
+        <div class="status-boxes">
+            <div class="status-box expandable" data-area="pier">
+                <h3>At Pier <span style="font-size: 0.8em; cursor: pointer;" onclick="toggleExpand(this)">▼</span></h3>
+                <div class="status-box-content" id="pierSmallBox"></div>
+            </div>
+            <div class="status-box" data-area="tow">
+                <h3>Being Towed</h3>
+                <div class="status-box-content" id="towSmallBox"></div>
+            </div>
+            <div class="status-box" data-area="transit">
+                <h3>In Transit</h3>
+                <div class="status-box-content" id="transitSmallBox"></div>
+            </div>
+            <div class="status-box" data-area="operational-area">
+                <h3>Operational Area</h3>
+                <div class="status-box-content" id="operationalAreaSmallBox"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <input type="file" id="bgImageInput" accept="image/*">
+            <button onclick="uploadBackground()">Set Background Image</button>
+            <button onclick="saveLayout()">Save All</button>
+            <button onclick="loadLayout()">Load All</button>
+            <button onclick="exportToCSV()">Export Status Log</button>
+            <button onclick="generateViewOnlyLink()">Generate View-Only Link</button>
+            <button onclick="window.resetStatusDisplay()" style="background: linear-gradient(45deg, #ff6b6b, #ff5252);">Reset Display</button>
+            <div class="boat-count">
+                Total Boats: <span id="boatCount">0</span> | 
+                Total Pods: <span id="podCount">0</span>
+            </div>
+        </div>
+
+        <div class="status-tracker">
+            <h2>Status Tracking</h2>
+            <div class="table-container">
+                <table id="statusTable">
+                    <thead>
+                        <tr>
+                            <th>Boat</th>
+                            <th>Group</th>
+                            <th>No Check</th>
+                            <th>Platform</th>
+                            <th>Pierside</th>
+                            <th>Pre-Tow</th>
+                            <th>Post-Tow</th>
+                            <th>Being Towed</th>
+                            <th>In Transit</th>
+                            <th>Op Area</th>
+                            <th>Return Pier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statusTableBody">
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-controls">
+                <button onclick="exportToCSV()">Export to CSV</button>
+                <button onclick="clearStatusTable()">Clear Table</button>
+                <div class="google-sheets-info" style="flex: 1; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 5px; margin-left: 20px;">
+                    <p style="margin-bottom: 10px; color: #00bfff; font-weight: bold;">Google Sheets Integration:</p>
+                    <input type="text" id="webhookUrl" placeholder="Google Sheets webhook URL" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #333; border: 1px solid #555; border-radius: 5px; color: #fff;" />
+                    <button onclick="saveWebhookUrl()">Save URL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu"></div>
+
+<script>
+// Global state management
+const state = {
+    boats: new Map(),
+    pods: new Map(),
+    currentDisplay: 'pier',
+    layouts: new Map(), // Store layouts for each area
+    draggedItem: null,
+    rotatingBoat: null,
+    selectedPod: null,
+    isViewOnly: false,
+    pollTimer: null,
+    statusUpdateQueue: new Map(), // Enhanced duplicate prevention
+    lastProcessedUpdates: new Map() // Track last processed updates
+};
+
+// Constants
+const N8N_CONFIG = {
+    assignmentWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-assignments',
+    statusWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-status-update',
+    stateWebhook: 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-state'
+};
+
+const POLL_INTERVAL = 30000;
+const BOAT_SPACING = {
+    horizontal: 13, // Half width of small boat
+    vertical: 15,
+    podSpacing: 6.5 // Quarter width of small boat
+};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSystem();
+});
+
+function initializeSystem() {
+    // Check view-only mode
+    const urlParams = new URLSearchParams(window.location.search);
+    state.isViewOnly = urlParams.get('view') === 'only';
+    
+    if (state.isViewOnly) {
+        enableViewOnlyMode();
+    }
+    
+    // Initialize display
+    setupMainDisplay();
+    setupContextMenu();
+    setupEventListeners();
+    
+    // Load saved state
+    loadSavedState();
+    
+    // Start polling
+    startPolling();
+    
+    console.log('✅ Boat Status Display v5 initialized');
+}
+
+// Main display management
+function setupMainDisplay() {
+    const mainDisplay = document.getElementById('mainDisplay');
+    const displaySelect = document.getElementById('mainDisplaySelect');
+    
+    displaySelect.addEventListener('change', function() {
+        state.currentDisplay = this.value;
+        updateMainDisplay();
+    });
+    
+    // Set up drag and drop for main display
+    mainDisplay.addEventListener('dragover', handleDragOver);
+    mainDisplay.addEventListener('drop', handleDrop);
+    
+    // Context menu for creating pods
+    mainDisplay.addEventListener('contextmenu', function(e) {
+        if (!state.isViewOnly && !e.target.closest('.boat-wrapper')) {
+            e.preventDefault();
+            showAreaContextMenu(e, state.currentDisplay);
+        }
+    });
+}
+
+// Update main display based on current selection
+function updateMainDisplay() {
+    const mainDisplay = document.getElementById('mainDisplay');
+    mainDisplay.innerHTML = '';
+    
+    // Update background if pier
+    if (state.currentDisplay === 'pier') {
+        const savedBg = localStorage.getItem('pierBackground');
+        if (savedBg) {
+            mainDisplay.style.backgroundImage = savedBg;
+        }
+        mainDisplay.classList.add('draggable-area');
+    } else {
+        mainDisplay.style.backgroundImage = '';
+        mainDisplay.classList.remove('draggable-area');
+    }
+    
+    // Load saved layout or default arrangement
+    const layout = state.layouts.get(state.currentDisplay);
+    if (layout && state.currentDisplay === 'pier') {
+        // Apply saved layout for pier
+        applyPierLayout(layout);
+    } else {
+        // Default arrangement for other areas
+        arrangeBoatsInArea(state.currentDisplay);
+    }
+}
+
+// Arrange boats in default pod/boat pattern
+function arrangeBoatsInArea(area) {
+    const mainDisplay = document.getElementById('mainDisplay');
+    const smallBox = document.getElementById(area + 'SmallBox');
+    
+    // Get all boats and pods for this area
+    const areaBoats = [];
+    const areaPods = [];
+    
+    state.boats.forEach((boat, id) => {
+        if (boat.location === area && !boat.podId) {
+            areaBoats.push(boat);
+        }
+    });
+    
+    state.pods.forEach((pod, id) => {
+        if (pod.location === area) {
+            areaPods.push(pod);
+        }
+    });
+    
+    // Sort boats by group then number
+    areaBoats.sort((a, b) => {
+        if (a.userGroup !== b.userGroup) {
+            return a.userGroup === 'lat' ? -1 : 1;
+        }
+        return a.id - b.id;
+    });
+    
+    // Clear displays
+    mainDisplay.innerHTML = '';
+    smallBox.innerHTML = '';
+    
+    // Position pods first, then individual boats
+    let currentX = 20;
+    let currentY = 20;
+    let rowHeight = 0;
+    
+    // Add pods
+    areaPods.forEach(pod => {
+        const podElement = createPodElement(pod);
+        
+        // Check if pod fits in current row
+        const podWidth = calculatePodWidth(pod);
+        if (currentX + podWidth > mainDisplay.offsetWidth - 40) {
+            currentX = 20;
+            currentY += rowHeight + BOAT_SPACING.vertical;
+            rowHeight = 0;
+        }
+        
+        // Position pod
+        if (area === state.currentDisplay) {
+            podElement.style.position = 'absolute';
+            podElement.style.left = currentX + 'px';
+            podElement.style.top = currentY + 'px';
+            mainDisplay.appendChild(podElement);
+        }
+        
+        // Add to small box
+        const smallPodElement = createPodElement(pod, true);
+        smallBox.appendChild(smallPodElement);
+        
+        currentX += podWidth + BOAT_SPACING.podSpacing;
+        rowHeight = Math.max(rowHeight, calculatePodHeight(pod));
+    });
+    
+    // Add individual boats
+    areaBoats.forEach(boat => {
+        const boatElement = boat.element;
+        
+        // Check if boat fits in current row
+        const boatWidth = boat.type === 1 ? 34 : 30;
+        if (currentX + boatWidth > mainDisplay.offsetWidth - 40) {
+            currentX = 20;
+            currentY += rowHeight + BOAT_SPACING.vertical;
+            rowHeight = 0;
+        }
+        
+        // Position boat in main display
+        if (area === state.currentDisplay) {
+            boatElement.style.position = 'absolute';
+            boatElement.style.left = currentX + 'px';
+            boatElement.style.top = currentY + 'px';
+            boatElement.style.transform = 'rotate(0deg)';
+            mainDisplay.appendChild(boatElement);
+        }
+        
+        // Clone for small box
+        const smallBoatElement = boatElement.cloneNode(true);
+        smallBoatElement.classList.add('in-small-box');
+        smallBoatElement.style.position = 'relative';
+        smallBoatElement.style.left = '';
+        smallBoatElement.style.top = '';
+        smallBoatElement.style.transform = '';
+        smallBox.appendChild(smallBoatElement);
+        
+        currentX += boatWidth + BOAT_SPACING.horizontal;
+        rowHeight = Math.max(rowHeight, boat.type === 1 ? 64 : 48);
+    });
+}
+
+// Enhanced duplicate prevention for status updates
+function shouldProcessStatusUpdate(boatId, status, operator, timestamp) {
+    const key = `${boatId}-${status}`;
+    const lastUpdate = state.statusUpdateQueue.get(key);
+    
+    if (!lastUpdate) {
+        // First time seeing this status
+        state.statusUpdateQueue.set(key, { operator, timestamp, count: 1 });
+        return true;
+    }
+    
+    const now = new Date();
+    const updateTime = new Date(timestamp || now);
+    const lastUpdateTime = new Date(lastUpdate.timestamp);
+    const timeDiff = updateTime - lastUpdateTime;
+    
+    // Prevent duplicate within 2 minutes unless operator changed
+    if (timeDiff < 120000 && operator === lastUpdate.operator) {
+        console.log(`Duplicate prevention: ${boatId} ${status} by ${operator} (${timeDiff}ms since last)`);
+        return false;
+    }
+    
+    // Update tracking
+    state.statusUpdateQueue.set(key, { operator, timestamp: updateTime, count: lastUpdate.count + 1 });
+    
+    // Clean old entries
+    setTimeout(() => {
+        const current = state.statusUpdateQueue.get(key);
+        if (current && current.timestamp === updateTime) {
+            state.statusUpdateQueue.delete(key);
+        }
+    }, 300000); // 5 minutes
+    
+    return true;
+}
+
+// Enhanced addStatusToTable with duplicate prevention
+function addStatusToTable(boatId, boatData, status, operator, options = {}) {
+    // Skip if this is a duplicate
+    if (!shouldProcessStatusUpdate(boatId, status, operator, options.timestamp)) {
+        return;
+    }
+    
+    const tbody = document.getElementById('statusTableBody');
+    const prefix = boatData.type === 1 ? 'C' : 'G';
+    const paddedNumber = boatId.toString().padStart(2, '0');
+    const boatName = `${prefix}${paddedNumber}`;
+    
+    // Map status names
+    const statusColumnMap = {
+        'none': 'none',
+        'platform': 'platform',
+        'pierside': 'pierside',
+        'pretow': 'pretow',
+        'operational': 'operational',
+        'tow': 'tow',
+        'transit': 'transit',
+        'operational-area': 'oparea',
+        'return-pier': 'return'
+    };
+    
+    const columnStatus = statusColumnMap[status] || status;
+    
+    // Find existing rows
+    const existingRows = Array.from(tbody.querySelectorAll(`tr[data-boat-id="${boatId}"]`));
+    let targetRow = null;
+    
+    if (existingRows.length === 0) {
+        // Create first row
+        targetRow = createNewRow(boatId, boatName, boatData);
+        tbody.insertBefore(targetRow, tbody.firstChild);
+    } else {
+        // Check if this specific status has been recorded in any row
+        let foundEmptyCell = false;
+        
+        for (const row of existingRows) {
+            const statusCell = row.querySelector(`td[data-status="${columnStatus}"]`);
+            if (statusCell && statusCell.innerHTML.trim() === '') {
+                targetRow = row;
+                foundEmptyCell = true;
+                break;
+            }
+        }
+        
+        if (!foundEmptyCell) {
+            // Status has been recorded before - create new row only for movement statuses
+            const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+            if (movementStatuses.includes(status)) {
+                targetRow = createNewRow(boatId, boatName, boatData);
+                const lastRow = existingRows[existingRows.length - 1];
+                lastRow.parentNode.insertBefore(targetRow, lastRow.nextSibling);
+            } else {
+                // Don't create new row for check statuses
+                console.log(`Check status ${status} already recorded for boat ${boatId}`);
+                return;
+            }
+        }
+    }
+    
+    // Update the cell
+    if (targetRow) {
+        const statusCell = targetRow.querySelector(`td[data-status="${columnStatus}"]`);
+        if (statusCell && statusCell.innerHTML.trim() === '') {
+            updateStatusCell(statusCell, status, boatData.status, operator, options.timestamp);
+            
+            // Log to console
+            const timestamp = options.timestamp || new Date();
+            const timeStr = new Date(timestamp).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            console.log(`Status recorded: ${boatName} - ${status} at ${timeStr} by ${operator}`);
+            
+            // Send to Google Sheets
+            sendToGoogleSheets(boatId, boatData, status, operator);
+        }
+    }
+}
+
+// Update status cell with manual override capability
+function updateStatusCell(cell, status, checkStatus, operator, timestamp) {
+    const ts = timestamp || new Date();
+    const timeStr = new Date(ts).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+    });
+    
+    // For movement statuses, use the boat's current check status color
+    let colorStatus = status;
+    if (['tow', 'transit', 'operational-area', 'return-pier'].includes(status)) {
+        colorStatus = checkStatus;
+    }
+    
+    cell.className = `status-${colorStatus}`;
+    cell.innerHTML = `${timeStr}<br><small>${operator}</small>`;
+    cell.title = `${new Date(ts).toLocaleString()} - ${operator}`;
+    
+    // Add context menu for manual override
+    cell.addEventListener('contextmenu', function(e) {
+        if (!state.isViewOnly) {
+            e.preventDefault();
+            showCellContextMenu(e, cell, status);
+        }
+    });
+}
+
+// Show context menu for manual cell override
+function showCellContextMenu(e, cell, status) {
+    const menu = document.getElementById('contextMenu');
+    
+    menu.innerHTML = `
+        <div class="context-menu-item" onclick="manualOverrideCell(this, '${status}')">
+            ✏️ Manual Override
+        </div>
+        <div class="context-menu-item" onclick="clearCell(this)">
+            🗑️ Clear Cell
+        </div>
+    `;
+    
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    menu.style.display = 'block';
+    menu.dataset.targetCell = cell.id || generateCellId(cell);
+}
+
+// Manual override for status cell
+function manualOverrideCell(menuItem, status) {
+    const menu = menuItem.closest('.context-menu');
+    const cellId = menu.dataset.targetCell;
+    const cell = document.getElementById(cellId) || findCellById(cellId);
+    
+    if (!cell) return;
+    
+    const timeInput = prompt('Enter time (HH:MM) or leave blank for current time:');
+    const operatorInput = prompt('Enter operator name:', localStorage.getItem('lastOperator') || '');
+    
+    if (operatorInput) {
+        localStorage.setItem('lastOperator', operatorInput);
+        
+        let timestamp = new Date();
+        if (timeInput) {
+            const [hours, minutes] = timeInput.split(':');
+            timestamp.setHours(parseInt(hours), parseInt(minutes), 0);
+        }
+        
+        // Extract boat info from row
+        const row = cell.closest('tr');
+        const boatId = parseInt(row.dataset.boatId);
+        const boatData = state.boats.get(boatId);
+        
+        if (boatData) {
+            // Update cell directly
+            updateStatusCell(cell, status, boatData.status, operatorInput, timestamp);
+            
+            // Send update to server
+            sendManualOverride(boatId, status, operatorInput, timestamp);
+        }
+    }
+    
+    menu.style.display = 'none';
+}
+
+// Create pod element
+function createPodElement(pod, isSmallBox = false) {
+    const podDiv = document.createElement('div');
+    podDiv.className = 'pod';
+    podDiv.dataset.podId = pod.id;
+    
+    if (!isSmallBox) {
+        podDiv.style.position = 'absolute';
+        
+        // Make pod draggable in main display
+        if (!state.isViewOnly && state.currentDisplay === pod.location) {
+            podDiv.draggable = true;
+            podDiv.addEventListener('dragstart', handlePodDragStart);
+            podDiv.addEventListener('dragend', handleDragEnd);
+            
+            // Click to select pod
+            podDiv.addEventListener('click', function(e) {
+                if (!e.target.closest('.boat-wrapper')) {
+                    selectPod(pod.id);
+                }
+            });
+        }
+    }
+    
+    // Add boats to pod
+    pod.boats.forEach(boatId => {
+        const boat = state.boats.get(boatId);
+        if (boat) {
+            const boatElement = boat.element.cloneNode(true);
+            boatElement.style.position = 'relative';
+            boatElement.style.left = '';
+            boatElement.style.top = '';
+            boatElement.classList.add('in-small-box');
+            
+            // Sync rotation with pod
+            if (pod.rotation) {
+                boatElement.style.transform = `rotate(${pod.rotation}deg)`;
+            }
+            
+            podDiv.appendChild(boatElement);
+        }
+    });
+    
+    return podDiv;
+}
+
+// Pod management functions
+function createPod(boatIds, location) {
+    const podId = 'pod_' + Date.now();
+    const pod = {
+        id: podId,
+        boats: boatIds,
+        location: location,
+        rotation: 0,
+        x: 0,
+        y: 0
+    };
+    
+    state.pods.set(podId, pod);
+    
+    // Update boats to reference pod
+    boatIds.forEach(boatId => {
+        const boat = state.boats.get(boatId);
+        if (boat) {
+            boat.podId = podId;
+        }
+    });
+    
+    updatePodCount();
+    updateMainDisplay();
+    updateSmallBoxes();
+    
+    return pod;
+}
+
+function selectPod(podId) {
+    // Deselect previous
+    if (state.selectedPod) {
+        const prevPod = document.querySelector(`[data-pod-id="${state.selectedPod}"]`);
+        if (prevPod) {
+            prevPod.classList.remove('selected');
+        }
+    }
+    
+    // Select new
+    state.selectedPod = podId;
+    const podElement = document.querySelector(`[data-pod-id="${podId}"]`);
+    if (podElement) {
+        podElement.classList.add('selected');
+    }
+}
+
+// Boat creation
+function createBoat(config) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `boat-wrapper user-${config.userGroup}`;
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = config.x + 'px';
+    wrapper.style.top = config.y + 'px';
+    wrapper.style.transform = `rotate(${config.rotation || 0}deg)`;
+    wrapper.style.width = config.type === 1 ? '34px' : '30px';
+    wrapper.style.height = config.type === 1 ? '64px' : '48px';
+    wrapper.id = `boat-wrapper-${config.id}`;
+    wrapper.draggable = !state.isViewOnly;
+    
+    // Create outline
+    const outline = document.createElement('div');
+    outline.className = 'boat-outline';
+    
+    const boat = document.createElement('div');
+    boat.className = `boat boat-type-${config.type} status-${config.status}`;
+    boat.id = `boat-${config.id}`;
+    boat.style.position = 'relative';
+    boat.style.width = config.type === 1 ? '30px' : '26px';
+    boat.style.height = config.type === 1 ? '60px' : '44px';
+    boat.style.top = '2px';
+    boat.style.left = '2px';
+    boat.style.zIndex = '1';
+    
+    // Add boat number
+    const prefix = config.type === 1 ? 'C' : 'G';
+    const paddedNumber = config.id.toString().padStart(2, '0');
+    
+    const boatNumber = document.createElement('span');
+    boatNumber.className = 'boat-number';
+    boatNumber.textContent = `${prefix}${paddedNumber}`;
+    boat.appendChild(boatNumber);
+    
+    // Create user indicator
+    const userIndicator = document.createElement('div');
+    userIndicator.className = 'user-indicator';
+    userIndicator.textContent = config.userGroup === 'leg' ? 'Leg' : 'Lat';
+    userIndicator.style.zIndex = '3';
+    
+    // Create rotation handle
+    const rotationHandle = document.createElement('div');
+    rotationHandle.className = 'rotation-handle';
+    rotationHandle.style.zIndex = '4';
+    rotationHandle.title = 'Click and drag to rotate';
+    
+    if (state.isViewOnly) {
+        rotationHandle.style.display = 'none';
+    }
+    
+    // Assemble elements
+    wrapper.appendChild(outline);
+    wrapper.appendChild(boat);
+    wrapper.appendChild(userIndicator);
+    wrapper.appendChild(rotationHandle);
+    
+    // Add event listeners
+    if (!state.isViewOnly) {
+        wrapper.addEventListener('dragstart', handleDragStart);
+        wrapper.addEventListener('dragend', handleDragEnd);
+        
+        rotationHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            handleRotationStart(e, wrapper);
+        });
+        
+        wrapper.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            showBoatContextMenu(e, config.id);
+        });
+    }
+    
+    // Store boat data
+    const boatData = {
+        id: config.id,
+        element: wrapper,
+        boat: boat,
+        type: config.type,
+        userGroup: config.userGroup,
+        status: config.status,
+        location: config.location || 'pier',
+        x: config.x,
+        y: config.y,
+        rotation: config.rotation || 0,
+        podId: null
+    };
+    
+    state.boats.set(config.id, boatData);
+    
+    // Add to appropriate area
+    if (boatData.location === state.currentDisplay) {
+        document.getElementById('mainDisplay').appendChild(wrapper);
+    }
+    
+    updateBoatCount();
+    updateSmallBoxes();
+    
+    return boatData;
+}
+
+// Update boat status without moving
+function updateBoatStatus(boatId, newStatus, operator = 'Unknown') {
+    const boatData = state.boats.get(boatId);
+    if (!boatData) return;
+    
+    const oldStatus = boatData.status;
+    const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+    const isMovementStatus = movementStatuses.includes(newStatus);
+    
+    // Always add to status table
+    addStatusToTable(boatId, boatData, newStatus, operator);
+    
+    if (isMovementStatus) {
+        // Movement status - move the boat
+        let targetLocation = '';
+        if (newStatus === 'tow') targetLocation = 'tow';
+        else if (newStatus === 'transit') targetLocation = 'transit';
+        else if (newStatus === 'operational-area') targetLocation = 'operational-area';
+        else if (newStatus === 'return-pier') targetLocation = 'pier';
+        
+        if (targetLocation && boatData.location !== targetLocation) {
+            moveBoatToArea(boatId, targetLocation);
+        }
+    } else {
+        // Check status - ONLY update color, never move
+        boatData.status = newStatus;
+        boatData.boat.className = `boat boat-type-${boatData.type} status-${newStatus}`;
+    }
+    
+    // Send update to server
+    sendStatusUpdate(boatId, newStatus, operator);
+}
+
+// Move boat to area
+function moveBoatToArea(boatId, area) {
+    const boatData = state.boats.get(boatId);
+    if (!boatData) return;
+    
+    // Remove from pod if in one
+    if (boatData.podId) {
+        const pod = state.pods.get(boatData.podId);
+        if (pod) {
+            pod.boats = pod.boats.filter(id => id !== boatId);
+            if (pod.boats.length === 0) {
+                state.pods.delete(boatData.podId);
+            }
+            boatData.podId = null;
+        }
+    }
+    
+    boatData.location = area;
+    
+    // Update displays
+    updateMainDisplay();
+    updateSmallBoxes();
+}
+
+// Update from server state with enhanced duplicate prevention
+async function updateFromServerState() {
+    const response = await fetch(N8N_CONFIG.stateWebhook);
+    if (!response.ok) return;
+    
+    const serverState = await response.json();
+    if (!serverState || !serverState.boats) return;
+    
+    console.log(`Updating from server: ${serverState.boats.length} boats`);
+    
+    // Track which updates have been processed
+    const processedThisCycle = new Set();
+    
+    serverState.boats.forEach(boatData => {
+        const existingBoat = state.boats.get(boatData.id);
+        
+        if (existingBoat) {
+            // Update existing boat
+            const updateKey = `${boatData.id}-${boatData.status}-${boatData.lastUpdated}`;
+            
+            // Skip if we've already processed this exact update
+            if (state.lastProcessedUpdates.has(updateKey)) {
+                return;
+            }
+            
+            // Check if this is a new update (less than 2 minutes old)
+            if (boatData.lastUpdated) {
+                const updateTime = new Date(boatData.lastUpdated);
+                const now = new Date();
+                const timeDiff = now - updateTime;
+                
+                if (timeDiff > 120000) { // 2 minutes
+                    console.log(`Ignoring old update: boat ${boatData.id}, ${boatData.status} from ${boatData.lastUpdated}`);
+                    return;
+                }
+            }
+            
+            // Update visual state
+            existingBoat.userGroup = boatData.userGroup;
+            existingBoat.element.className = `boat-wrapper user-${boatData.userGroup}`;
+            existingBoat.element.querySelector('.user-indicator').textContent = 
+                boatData.userGroup === 'leg' ? 'Leg' : 'Lat';
+            
+            // Check for status changes
+            if (existingBoat.status !== boatData.status) {
+                // Only update if operator is not a system operator
+                const systemOperators = ['Initial', 'Assignment System', 'n8n Update'];
+                if (boatData.operator && !systemOperators.includes(boatData.operator)) {
+                    console.log(`Processing update for boat ${boatData.id}: ${boatData.status} by ${boatData.operator}`);
+                    
+                    // Update status and log
+                    existingBoat.status = boatData.status;
+                    existingBoat.boat.className = `boat boat-type-${existingBoat.type} status-${boatData.status}`;
+                    
+                    // Add to status table with timestamp
+                    addStatusToTable(boatData.id, existingBoat, boatData.status, boatData.operator, {
+                        timestamp: boatData.lastUpdated
+                    });
+                    
+                    // Mark as processed
+                    state.lastProcessedUpdates.set(updateKey, true);
+                    processedThisCycle.add(updateKey);
+                }
+            }
+            
+            // Check for location changes (movement statuses)
+            if (boatData.location && existingBoat.location !== boatData.location) {
+                const movementStatuses = ['tow', 'transit', 'operational-area'];
+                if (movementStatuses.includes(boatData.location)) {
+                    console.log(`Moving boat ${boatData.id} to ${boatData.location}`);
+                    moveBoatToArea(boatData.id, boatData.location);
+                }
+            }
+            
+        } else {
+            // Create new boat
+            console.log(`Creating new boat ${boatData.id}`);
+            createBoat({
+                id: boatData.id,
+                type: boatData.type,
+                userGroup: boatData.userGroup,
+                status: boatData.status,
+                location: boatData.location || 'pier',
+                x: boatData.x || 50 + (state.boats.size % 12) * 50,
+                y: boatData.y || 50 + Math.floor(state.boats.size / 12) * 70,
+                rotation: boatData.rotation || 0
+            });
+            
+            // Add initial status if not 'none'
+            if (boatData.status !== 'none') {
+                const newBoat = state.boats.get(boatData.id);
+                addStatusToTable(boatData.id, newBoat, boatData.status, 'Initial');
+            }
+        }
+    });
+    
+    // Clean up old processed updates (keep only last 100)
+    if (state.lastProcessedUpdates.size > 100) {
+        const entries = Array.from(state.lastProcessedUpdates.keys());
+        entries.slice(0, entries.length - 100).forEach(key => {
+            if (!processedThisCycle.has(key)) {
+                state.lastProcessedUpdates.delete(key);
+            }
+        });
+    }
+    
+    // Remove boats that don't exist on server
+    const serverBoatIds = new Set(serverState.boats.map(b => b.id));
+    const boatsToRemove = [];
+    
+    state.boats.forEach((boat, id) => {
+        if (!serverBoatIds.has(id)) {
+            boatsToRemove.push(id);
+        }
+    });
+    
+    boatsToRemove.forEach(id => {
+        console.log(`Removing boat ${id} - no longer on server`);
+        const boatData = state.boats.get(id);
+        if (boatData && boatData.element) {
+            boatData.element.remove();
+        }
+        state.boats.delete(id);
+    });
+    
+    // Update UI state for view-only mode
+    if (state.isViewOnly && serverState.uiState) {
+        applyUIState(serverState.uiState);
+    }
+    
+    updateBoatCount();
+    updateSmallBoxes();
+}
+
+// Setup context menu
+function setupContextMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'contextMenu';
+    menu.className = 'context-menu';
+    document.body.appendChild(menu);
+}
+
+// Context menu functions
+function showBoatContextMenu(e, boatId) {
+    const menu = document.getElementById('contextMenu');
+    const boatData = state.boats.get(boatId);
+    
+    if (!boatData) return;
+    
+    menu.innerHTML = `
+        <div class="context-menu-item" style="font-weight: bold; color: #00bfff;">
+            ${boatData.type === 1 ? 'C' : 'G'}${boatId.toString().padStart(2, '0')} - Status Update
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'none')">
+            <span class="status-indicator-menu status-none"></span>
+            No Check
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform')">
+            <span class="status-indicator-menu status-platform"></span>
+            Platform Check
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside')">
+            <span class="status-indicator-menu status-pierside"></span>
+            Pierside Check
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow')">
+            <span class="status-indicator-menu status-pretow"></span>
+            Pre-Tow Check
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational')">
+            <span class="status-indicator-menu status-operational"></span>
+            Post-Tow Check
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'tow')">
+            Being Towed
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'transit')">
+            In Transit
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational-area')">
+            Operational Area
+        </div>
+        <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'return-pier')">
+            Return to Pier
+        </div>
+    `;
+    
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    menu.style.display = 'block';
+}
+
+function showAreaContextMenu(e, area) {
+    const menu = document.getElementById('contextMenu');
+    
+    // Get all boats in this area
+    const areaBoats = [];
+    state.boats.forEach((boat, id) => {
+        if (boat.location === area && !boat.podId) {
+            areaBoats.push({ id, boat });
+        }
+    });
+    
+    // Sort boats
+    areaBoats.sort((a, b) => {
+        if (a.boat.userGroup !== b.boat.userGroup) {
+            return a.boat.userGroup === 'lat' ? -1 : 1;
+        }
+        return a.id - b.id;
+    });
+    
+    let menuHTML = `
+        <div class="context-menu-item" style="font-weight: bold; color: #00bfff;">
+            Create Pod
+        </div>
+        <div class="context-menu-separator"></div>
+    `;
+    
+    if (areaBoats.length === 0) {
+        menuHTML += `<div class="context-menu-item" style="color: #666;">No boats available</div>`;
+    } else {
+        areaBoats.forEach(({ id, boat }) => {
+            const prefix = boat.type === 1 ? 'C' : 'G';
+            const paddedNumber = id.toString().padStart(2, '0');
+            menuHTML += `
+                <div class="context-menu-item">
+                    <input type="checkbox" id="pod-boat-${id}" value="${id}" style="margin-right: 5px;">
+                    <label for="pod-boat-${id}" style="cursor: pointer;">
+                        ${prefix}${paddedNumber} (${boat.userGroup === 'leg' ? 'Leg' : 'Lat'})
+                    </label>
+                </div>
+            `;
+        });
+        
+        menuHTML += `
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item" onclick="createPodFromSelection('${area}')" style="background: linear-gradient(45deg, #00bfff, #b19cd9); color: #fff;">
+                Create Pod
+            </div>
+        `;
+    }
+    
+    menu.innerHTML = menuHTML;
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    menu.style.display = 'block';
+}
+
+// Create pod from selected boats
+function createPodFromSelection(area) {
+    const menu = document.getElementById('contextMenu');
+    const checkboxes = menu.querySelectorAll('input[type="checkbox"]:checked');
+    
+    if (checkboxes.length < 2) {
+        alert('Please select at least 2 boats to create a pod');
+        return;
+    }
+    
+    const boatIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    createPod(boatIds, area);
+    
+    menu.style.display = 'none';
+}
+
+// Event handlers
+function handleDragStart(e) {
+    if (state.isViewOnly) return;
+    
+    state.draggedItem = e.target.closest('.boat-wrapper');
+    if (!state.draggedItem) return;
+    
+    state.draggedItem.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handlePodDragStart(e) {
+    if (state.isViewOnly) return;
+    
+    state.draggedItem = e.target.closest('.pod');
+    if (!state.draggedItem) return;
+    
+    state.draggedItem.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    if (state.draggedItem) {
+        state.draggedItem.classList.remove('dragging');
+        state.draggedItem = null;
+    }
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    if (!state.draggedItem || state.currentDisplay !== 'pier') return;
+    
+    const mainDisplay = document.getElementById('mainDisplay');
+    const rect = mainDisplay.getBoundingClientRect();
+    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    if (state.draggedItem.classList.contains('pod')) {
+        // Handle pod drop
+        const podId = state.draggedItem.dataset.podId;
+        const pod = state.pods.get(podId);
+        if (pod) {
+            pod.x = x;
+            pod.y = y;
+            state.draggedItem.style.left = x + 'px';
+            state.draggedItem.style.top = y + 'px';
+        }
+    } else {
+        // Handle boat drop
+        const boatId = parseInt(state.draggedItem.id.replace('boat-wrapper-', ''));
+        const boatData = state.boats.get(boatId);
+        if (boatData) {
+            boatData.x = x;
+            boatData.y = y;
+            state.draggedItem.style.left = x + 'px';
+            state.draggedItem.style.top = y + 'px';
+        }
+    }
+    
+    saveDisplayLayout();
+}
+
+// Rotation handling
+function handleRotationStart(e, element) {
+    e.preventDefault();
+    state.rotatingBoat = element;
+    
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const currentRotation = element.style.transform.match(/rotate\((\d+)deg\)/);
+    const startAngle = currentRotation ? parseInt(currentRotation[1]) : 0;
+    
+    const mouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+    
+    element.dataset.rotationStart = startAngle;
+    element.dataset.mouseStart = mouseAngle;
+    
+    document.addEventListener('mousemove', handleRotation);
+    document.addEventListener('mouseup', handleRotationEnd);
+}
+
+function handleRotation(e) {
+    if (!state.rotatingBoat) return;
+    
+    const rect = state.rotatingBoat.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const currentMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+    const mouseStart = parseFloat(state.rotatingBoat.dataset.mouseStart);
+    const rotationStart = parseFloat(state.rotatingBoat.dataset.rotationStart);
+    
+    const angleDiff = currentMouseAngle - mouseStart;
+    const newRotation = rotationStart + angleDiff;
+    
+    state.rotatingBoat.style.transform = `rotate(${newRotation}deg)`;
+    
+    // Update boat data
+    const boatId = parseInt(state.rotatingBoat.id.replace('boat-wrapper-', ''));
+    const boatData = state.boats.get(boatId);
+    if (boatData) {
+        boatData.rotation = newRotation;
+        
+        // If boat is in a pod, rotate all boats in pod
+        if (boatData.podId) {
+            const pod = state.pods.get(boatData.podId);
+            if (pod) {
+                pod.rotation = newRotation;
+                pod.boats.forEach(id => {
+                    const boat = state.boats.get(id);
+                    if (boat && boat.element !== state.rotatingBoat) {
+                        boat.element.style.transform = `rotate(${newRotation}deg)`;
+                        boat.rotation = newRotation;
+                    }
+                });
+            }
+        }
+    }
+}
+
+function handleRotationEnd(e) {
+    document.removeEventListener('mousemove', handleRotation);
+    document.removeEventListener('mouseup', handleRotationEnd);
+    state.rotatingBoat = null;
+    saveDisplayLayout();
+}
+
+// Utility functions
+function updateBoatCount() {
+    document.getElementById('boatCount').textContent = state.boats.size;
+}
+
+function updatePodCount() {
+    document.getElementById('podCount').textContent = state.pods.size;
+}
+
+function updateSmallBoxes() {
+    const areas = ['pier', 'tow', 'transit', 'operational-area'];
+    
+    areas.forEach(area => {
+        const smallBox = document.getElementById(area.replace('-', '') + 'SmallBox');
+        if (!smallBox) return;
+        
+        smallBox.innerHTML = '';
+        
+        // Add pods
+        state.pods.forEach(pod => {
+            if (pod.location === area) {
+                const podElement = createPodElement(pod, true);
+                smallBox.appendChild(podElement);
+            }
+        });
+        
+        // Add individual boats
+        state.boats.forEach(boat => {
+            if (boat.location === area && !boat.podId) {
+                const boatElement = boat.element.cloneNode(true);
+                boatElement.classList.add('in-small-box');
+                boatElement.style.position = 'relative';
+                boatElement.style.left = '';
+                boatElement.style.top = '';
+                smallBox.appendChild(boatElement);
+            }
+        });
+    });
+}
+
+function toggleExpand(element) {
+    const box = element.closest('.status-box');
+    box.classList.toggle('expanded');
+    element.textContent = box.classList.contains('expanded') ? '▲' : '▼';
+}
+
+// Helper functions
+function createNewRow(boatId, boatName, boatData) {
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-boat-id', boatId);
+    
+    // Boat
+    const boatCell = document.createElement('td');
+    boatCell.textContent = boatName;
+    newRow.appendChild(boatCell);
+    
+    // Group
+    const groupCell = document.createElement('td');
+    groupCell.textContent = boatData.userGroup === 'leg' ? 'Leg' : 'Lat';
+    groupCell.style.color = boatData.userGroup === 'leg' ? '#b19cd9' : '#00bfff';
+    newRow.appendChild(groupCell);
+    
+    // Status cells
+    const statuses = ['none', 'platform', 'pierside', 'pretow', 'operational', 'tow', 'transit', 'oparea', 'return'];
+    statuses.forEach(s => {
+        const cell = document.createElement('td');
+        cell.setAttribute('data-status', s);
+        cell.id = `cell-${boatId}-${s}-${Date.now()}`;
+        newRow.appendChild(cell);
+    });
+    
+    return newRow;
+}
+
+function generateCellId(cell) {
+    const row = cell.closest('tr');
+    const boatId = row.dataset.boatId;
+    const status = cell.dataset.status;
+    return `cell-${boatId}-${status}-${Date.now()}`;
+}
+
+function findCellById(cellId) {
+    return document.querySelector(`[id="${cellId}"]`);
+}
+
+function calculatePodWidth(pod) {
+    let width = 0;
+    pod.boats.forEach(boatId => {
+        const boat = state.boats.get(boatId);
+        if (boat) {
+            width += (boat.type === 1 ? 34 : 30) + BOAT_SPACING.podSpacing;
+        }
+    });
+    return width;
+}
+
+function calculatePodHeight(pod) {
+    let maxHeight = 0;
+    pod.boats.forEach(boatId => {
+        const boat = state.boats.get(boatId);
+        if (boat) {
+            maxHeight = Math.max(maxHeight, boat.type === 1 ? 64 : 48);
+        }
+    });
+    return maxHeight;
+}
+
+// Save/Load functions
+function saveDisplayLayout() {
+    if (state.currentDisplay === 'pier') {
+        const layout = {
+            boats: [],
+            pods: []
+        };
+        
+        // Save boat positions
+        state.boats.forEach((boat, id) => {
+            if (boat.location === 'pier' && !boat.podId) {
+                layout.boats.push({
+                    id: id,
+                    x: boat.x,
+                    y: boat.y,
+                    rotation: boat.rotation
+                });
+            }
+        });
+        
+        // Save pod positions
+        state.pods.forEach((pod, id) => {
+            if (pod.location === 'pier') {
+                layout.pods.push({
+                    id: id,
+                    x: pod.x,
+                    y: pod.y,
+                    rotation: pod.rotation
+                });
+            }
+        });
+        
+        state.layouts.set('pier', layout);
+        localStorage.setItem('pierLayout', JSON.stringify(layout));
+    }
+}
+
+function loadDisplayLayout() {
+    const savedLayout = localStorage.getItem('pierLayout');
+    if (savedLayout) {
+        const layout = JSON.parse(savedLayout);
+        state.layouts.set('pier', layout);
+        
+        if (state.currentDisplay === 'pier') {
+            applyPierLayout(layout);
+        }
+    }
+}
+
+function applyPierLayout(layout) {
+    const mainDisplay = document.getElementById('mainDisplay');
+    
+    // Apply boat positions
+    layout.boats.forEach(savedBoat => {
+        const boat = state.boats.get(savedBoat.id);
+        if (boat && boat.location === 'pier') {
+            boat.x = savedBoat.x;
+            boat.y = savedBoat.y;
+            boat.rotation = savedBoat.rotation;
+            
+            boat.element.style.left = savedBoat.x + 'px';
+            boat.element.style.top = savedBoat.y + 'px';
+            boat.element.style.transform = `rotate(${savedBoat.rotation}deg)`;
+            
+            mainDisplay.appendChild(boat.element);
+        }
+    });
+    
+    // Apply pod positions
+    layout.pods.forEach(savedPod => {
+        const pod = state.pods.get(savedPod.id);
+        if (pod && pod.location === 'pier') {
+            pod.x = savedPod.x;
+            pod.y = savedPod.y;
+            pod.rotation = savedPod.rotation;
+            
+            const podElement = createPodElement(pod);
+            podElement.style.left = savedPod.x + 'px';
+            podElement.style.top = savedPod.y + 'px';
+            
+            mainDisplay.appendChild(podElement);
+        }
+    });
+}
+
+function saveLayout() {
+    const data = {
+        boats: Array.from(state.boats.entries()).map(([id, boat]) => ({
+            id: id,
+            type: boat.type,
+            userGroup: boat.userGroup,
+            status: boat.status,
+            location: boat.location,
+            x: boat.x,
+            y: boat.y,
+            rotation: boat.rotation,
+            podId: boat.podId
+        })),
+        pods: Array.from(state.pods.entries()).map(([id, pod]) => ({
+            id: id,
+            boats: pod.boats,
+            location: pod.location,
+            x: pod.x,
+            y: pod.y,
+            rotation: pod.rotation
+        })),
+        layouts: Object.fromEntries(state.layouts),
+        background: localStorage.getItem('pierBackground'),
+        statusTable: document.getElementById('statusTableBody').innerHTML
+    };
+    
+    localStorage.setItem('boatDisplayV5', JSON.stringify(data));
+    alert('Layout saved successfully!');
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem('boatDisplayV5');
+    if (saved) {
+        const data = JSON.parse(saved);
+        
+        // Clear existing
+        state.boats.clear();
+        state.pods.clear();
+        
+        // Load boats
+        data.boats.forEach(boatData => {
+            createBoat(boatData);
+        });
+        
+        // Load pods
+        if (data.pods) {
+            data.pods.forEach(podData => {
+                state.pods.set(podData.id, podData);
+                
+                // Update boat references
+                podData.boats.forEach(boatId => {
+                    const boat = state.boats.get(boatId);
+                    if (boat) {
+                        boat.podId = podData.id;
+                    }
+                });
+            });
+        }
+        
+        // Load layouts
+        if (data.layouts) {
+            Object.entries(data.layouts).forEach(([area, layout]) => {
+                state.layouts.set(area, layout);
+            });
+        }
+        
+        // Load background
+        if (data.background) {
+            localStorage.setItem('pierBackground', data.background);
+            if (state.currentDisplay === 'pier') {
+                document.getElementById('mainDisplay').style.backgroundImage = data.background;
+            }
+        }
+        
+        // Load status table
+        if (data.statusTable) {
+            document.getElementById('statusTableBody').innerHTML = data.statusTable;
+        }
+        
+        updateBoatCount();
+        updatePodCount();
+        updateMainDisplay();
+        updateSmallBoxes();
+        
+        alert('Layout loaded successfully!');
+    }
+}
+
+function loadSavedState() {
+    // Load from localStorage
+    loadLayout();
+    
+    // Load webhook URL
+    const webhookUrl = localStorage.getItem('googleSheetsWebhook');
+    if (webhookUrl) {
+        document.getElementById('webhookUrl').value = webhookUrl;
+    }
+}
+
+// Export functions
+function exportToCSV() {
+    const table = document.getElementById('statusTable');
+    let csv = [];
+    
+    // Headers
+    const headers = [];
+    for (let i = 0; i < table.rows[0].cells.length; i++) {
+        headers.push(table.rows[0].cells[i].textContent);
+    }
+    csv.push(headers.join(','));
+    
+    // Data rows
+    for (let i = 1; i < table.rows.length; i++) {
+        const row = [];
+        for (let j = 0; j < table.rows[i].cells.length; j++) {
+            const cell = table.rows[i].cells[j];
+            const text = cell.textContent.replace(/\n/g, ' ').trim();
+            row.push(text.includes(',') ? `"${text}"` : text);
+        }
+        csv.push(row.join(','));
+    }
+    
+    // Download
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boat_status_tracking_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Background upload
+function uploadBackground() {
+    const input = document.getElementById('bgImageInput');
+    const file = input.files[0];
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const bgData = e.target.result;
+            localStorage.setItem('pierBackground', bgData);
+            
+            if (state.currentDisplay === 'pier') {
+                document.getElementById('mainDisplay').style.backgroundImage = `url(${bgData})`;
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Google Sheets integration
+function sendToGoogleSheets(boatId, boatData, status, operator) {
+    const webhookUrl = localStorage.getItem('googleSheetsWebhook');
+    if (webhookUrl) {
+        const prefix = boatData.type === 1 ? 'C' : 'G';
+        const data = {
+            timestamp: new Date().toISOString(),
+            boat: `${prefix}${boatId.toString().padStart(2, '0')}`,
+            group: boatData.userGroup === 'leg' ? 'Leg' : 'Lat',
+            status: status,
+            location: boatData.location,
+            operator: operator
+        };
+        
+        fetch(webhookUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        }).catch(err => console.log('Google Sheets update failed:', err));
+    }
+}
+
+function saveWebhookUrl() {
+    const url = document.getElementById('webhookUrl').value;
+    if (url) {
+        localStorage.setItem('googleSheetsWebhook', url);
+        alert('Google Sheets webhook URL saved!');
+    }
+}
+
+// Server communication
+async function sendStatusUpdate(boatId, status, operator) {
+    try {
+        const boatData = state.boats.get(boatId);
+        if (!boatData) return;
+        
+        const response = await fetch(N8N_CONFIG.statusWebhook, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                boatId: boatId,
+                status: status,
+                location: boatData.location,
+                operator: operator,
+                timestamp: new Date().toISOString(),
+                isCheckStatus: !['tow', 'transit', 'operational-area', 'return-pier'].includes(status)
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error sending status update:', error);
+    }
+}
+
+async function sendManualOverride(boatId, status, operator, timestamp) {
+    try {
+        const response = await fetch(N8N_CONFIG.statusWebhook, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                type: 'manualOverride',
+                boatId: boatId,
+                status: status,
+                operator: operator,
+                timestamp: timestamp.toISOString()
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error sending manual override:', error);
+    }
+}
+
+// Polling
+function startPolling() {
+    updateFromServerState();
+    state.pollTimer = setInterval(updateFromServerState, POLL_INTERVAL);
+}
+
+function stopPolling() {
+    if (state.pollTimer) {
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
+    }
+}
+
+// Event listeners
+function setupEventListeners() {
+    // Close context menu on click
+    document.addEventListener('click', function() {
+        document.getElementById('contextMenu').style.display = 'none';
+    });
+    
+    // Stop polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopPolling();
+        } else {
+            startPolling();
+        }
+    });
+}
+
+// View-only mode
+function enableViewOnlyMode() {
+    document.querySelector('.controls').style.display = 'none';
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'view-only-indicator';
+    indicator.textContent = '👁️ VIEW ONLY MODE';
+    document.querySelector('.header').appendChild(indicator);
+    
+    document.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function generateViewOnlyLink() {
+    const currentUrl = window.location.origin + window.location.pathname;
+    const viewOnlyUrl = currentUrl + '?view=only';
+    
+    navigator.clipboard.writeText(viewOnlyUrl).then(() => {
+        alert('View-only link copied to clipboard:\n' + viewOnlyUrl);
+    }).catch(() => {
+        prompt('View-only link:', viewOnlyUrl);
+    });
+}
+
+// Clear functions
+function clearStatusTable() {
+    if (confirm('Are you sure you want to clear the status tracking table?')) {
+        document.getElementById('statusTableBody').innerHTML = '';
+        state.statusUpdateQueue.clear();
+        state.lastProcessedUpdates.clear();
+    }
+}
+
+function clearCell(menuItem) {
+    const menu = menuItem.closest('.context-menu');
+    const cellId = menu.dataset.targetCell;
+    const cell = document.getElementById(cellId) || findCellById(cellId);
+    
+    if (cell && confirm('Clear this status entry?')) {
+        cell.innerHTML = '';
+        cell.className = '';
+    }
+    
+    menu.style.display = 'none';
+}
+
+// Reset function
+window.resetStatusDisplay = function() {
+    if (confirm('Are you sure you want to reset the entire display? This will remove all boats, pods, and status data.')) {
+        // Export data first
+        const hasData = state.boats.size > 0 || document.getElementById('statusTableBody').innerHTML.trim() !== '';
+        if (hasData) {
+            if (confirm('Would you like to export the status data before resetting?')) {
+                exportToCSV();
+            }
+        }
+        
+        // Clear everything
+        state.boats.forEach(boat => {
+            if (boat.element) boat.element.remove();
+        });
+        state.boats.clear();
+        state.pods.clear();
+        state.layouts.clear();
+        state.statusUpdateQueue.clear();
+        state.lastProcessedUpdates.clear();
+        
+        document.getElementById('statusTableBody').innerHTML = '';
+        document.getElementById('mainDisplay').style.backgroundImage = '';
+        
+        localStorage.removeItem('boatDisplayV5');
+        localStorage.removeItem('pierLayout');
+        localStorage.removeItem('pierBackground');
+        
+        updateBoatCount();
+        updatePodCount();
+        updateMainDisplay();
+        updateSmallBoxes();
+        
+        alert('Display has been reset.');
+    }
+}
+
+// Global function references
+window.updateBoatStatusFromMenu = function(boatId, status) {
+    const operator = prompt('Enter your name:', localStorage.getItem('lastOperator') || 'Manual');
+    if (operator) {
+        localStorage.setItem('lastOperator', operator);
+        updateBoatStatus(boatId, status, operator);
+    }
+    document.getElementById('contextMenu').style.display = 'none';
+}
+
+window.createPodFromSelection = createPodFromSelection;
+window.manualOverrideCell = manualOverrideCell;
+window.clearCell = clearCell;
+window.uploadBackground = uploadBackground;
+window.saveLayout = saveLayout;
+window.loadLayout = loadLayout;
+window.saveDisplayLayout = saveDisplayLayout;
+window.loadDisplayLayout = loadDisplayLayout;
+window.exportToCSV = exportToCSV;
+window.clearStatusTable = clearStatusTable;
+window.saveWebhookUrl = saveWebhookUrl;
+window.generateViewOnlyLink = generateViewOnlyLink;
+window.toggleExpand = toggleExpand;
+
+console.log('Boat Status Display System v5 loaded');
+</script>
+</body>
+</html>
