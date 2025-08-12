@@ -1609,7 +1609,7 @@ function createBoat(config) {
         id: config.id,
         element: wrapper,
         boat: boat,
-        type: config.type,
+        type: config.type || (config.id <= 70 ? 1 : 2),
         userGroup: config.userGroup,
         status: config.status || 'none',
         checkStatus: config.status || 'none',
@@ -2527,7 +2527,7 @@ async function updateFromServerState() {
                 console.log(`Creating new boat ${boatData.id}`);
                 const newBoat = createBoat({
                     id: boatData.id,
-                    type: boatData.type || 1,
+                    type: boatData.type || (boatData.id <= 70 ? 1 : 2),
                     userGroup: boatData.userGroup || 'lat',
                     status: 'none',
                     location: boatData.location || 'pier',
