@@ -2528,7 +2528,7 @@ async function updateFromServerState() {
                 const newBoat = createBoat({
                     id: boatData.id,
                     type: boatData.type || (boatData.id <= 70 ? 1 : 2),
-                    userGroup: boatData.userGroup || 'lat',
+                    userGroup: boatData.userGroup,
                     status: 'none',
                     location: boatData.location || 'pier',
                     x: null,
