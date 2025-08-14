@@ -722,6 +722,8 @@
     <script>
         // n8n webhook configuration
         const N8N_STATUS_WEBHOOK = 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-status-update';
+        // Also send to state webhook for immediate display update
+        const N8N_STATE_WEBHOOK = 'https://tacticalleadingedge.app.n8n.cloud/webhook/boat-state';
         
         let pendingUpdates = [];
 
@@ -746,26 +748,74 @@
 
         // Function to send status updates to n8n (handles both single and batch)
         async function sendStatusToN8n(updates) {
-            try {
-                // Determine the payload format
-                let payload;
-                
-                if (Array.isArray(updates)) {
-                    // Multiple updates - send as batch
-                    payload = { 
-                        updates: updates,
-                        type: 'batch'
-                    };
-                } else {
-                    // Single update - send directly
-                    payload = {
-                        boatId: updates.boatNumber || updates.boatId,
-                        status: updates.status,
-                        operator: updates.operator,
-                        timestamp: updates.timestamp || new Date().toISOString(),
-                        type: 'single'
-                    };
-                }
+    try {
+        // Prepare updates with boat numbers included
+        let processedUpdates;
+        
+        if (Array.isArray(updates)) {
+            processedUpdates = updates.map(u => ({
+                id: u.boatNumber || u.boatId,
+                boatId: u.boatNumber || u.boatId,
+                status: u.status,
+                operator: u.operator,
+                timestamp: u.timestamp || new Date().toISOString(),
+                checkStatus: u.status,
+                location: determineLocationFromStatus(u.status)
+            }));
+        } else {
+            processedUpdates = [{
+                id: updates.boatNumber || updates.boatId,
+                boatId: updates.boatNumber || updates.boatId,
+                status: updates.status,
+                operator: updates.operator,
+                timestamp: updates.timestamp || new Date().toISOString(),
+                checkStatus: updates.status,
+                location: determineLocationFromStatus(updates.status)
+            }];
+        }
+        
+        // Send to both webhooks
+        const payload = {
+            updates: processedUpdates,
+            type: Array.isArray(updates) ? 'batch' : 'single'
+        };
+        
+        console.log('Sending to n8n:', payload);
+        
+        // Send to status webhook
+        await fetch(N8N_STATUS_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        // Also update state directly for immediate display
+        if (N8N_STATE_WEBHOOK) {
+            await fetch(N8N_STATE_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'statusUpdate',
+                    boats: processedUpdates
+                })
+            });
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Error sending status update:', error);
+        throw error;
+    }
+}
+
+// Helper function to determine location from status
+function determineLocationFromStatus(status) {
+    if (status === 'tow') return 'tow';
+    if (status === 'transit') return 'transit';
+    if (status === 'operational-area') return 'operational-area';
+    if (status === 'return-pier') return 'pier';
+    return 'pier'; // Default for check statuses
+}
                 
                 console.log('Sending to n8n:', payload);
                 
