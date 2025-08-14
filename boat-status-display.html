@@ -877,11 +877,23 @@
             );
         }
 
-        /* Movement status cells */
-        td.status-tow, td.status-transit, td.status-oparea, td.status-return {
-            background-color: rgba(128, 128, 128, 0.3);
-            border: 1px solid #444;
-        }
+        /* Movement status cells - inherit boat's check status color */
+td.status-tow { 
+    border: 2px solid #444;
+    font-weight: bold;
+}
+td.status-transit { 
+    border: 2px solid #444;
+    font-weight: bold;
+}
+td.status-oparea { 
+    border: 2px solid #444;
+    font-weight: bold;
+}
+td.status-return { 
+    border: 2px solid #444;
+    font-weight: bold;
+}
 
         /* Table controls */
         .table-controls {
@@ -1262,8 +1274,12 @@ function initializeSystem() {
     
     if (state.isViewOnly) {
         enableViewOnlyMode();
-        // FIXED: Load shared state for view-only
+        // Load shared state for view-only
         loadViewOnlyState();
+    }
+    else {
+        // For non-view-only, also load shared state
+        loadSharedState();
     }
     
     // Initialize displays
@@ -1287,8 +1303,8 @@ function initializeSystem() {
     console.log('✅ Orange USV Status Display System initialized with enhanced features');
 }
 
-// FIXED: Load view-only state from server
-async function loadViewOnlyState() {
+//Load shared state for follow on displays after first instance
+async function loadSharedState() {
     try {
         const response = await fetch(N8N_CONFIG.stateWebhook);
         if (!response.ok) return;
@@ -1309,15 +1325,69 @@ async function loadViewOnlyState() {
                 });
             }
             
+            // Apply status table
+            if (serverState.uiState.statusTable) {
+                document.getElementById('statusTableBody').innerHTML = serverState.uiState.statusTable;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading shared state:', error);
+    }
+}
+    
+// Load view-only state from server
+async function loadViewOnlyState() {
+    try {
+        // First try to get from server
+        const response = await fetch(N8N_CONFIG.stateWebhook);
+        if (!response.ok) return;
+        
+        const serverState = await response.json();
+        
+        // Load UI state
+        if (serverState && serverState.uiState) {
+            // Apply layouts for ALL areas
+            if (serverState.uiState.layouts) {
+                Object.entries(serverState.uiState.layouts).forEach(([area, layout]) => {
+                    state.areaLayouts.set(area, layout);
+                    localStorage.setItem(`areaLayout-${area}`, JSON.stringify(layout));
+                });
+            }
+            
+            // Apply backgrounds for ALL areas
+            if (serverState.uiState.backgrounds) {
+                Object.entries(serverState.uiState.backgrounds).forEach(([area, bgData]) => {
+                    state.areaBackgrounds.set(area, bgData);
+                    localStorage.setItem(`background-${area}`, bgData);
+                });
+            }
+            
             // Apply current display
             if (serverState.uiState.currentDisplay) {
                 state.currentDisplay = serverState.uiState.currentDisplay;
                 document.getElementById('mainDisplaySelect').value = state.currentDisplay;
             }
             
-            // Update display with loaded state
-            updateMainDisplay();
+            // Apply status table with correct timestamps
+            if (serverState.uiState.statusTable) {
+                document.getElementById('statusTableBody').innerHTML = serverState.uiState.statusTable;
+                
+                // Re-attach context menus
+                document.querySelectorAll('td[data-status], .split-cell-left, .split-cell-right, .split-cell-triple-left, .split-cell-triple-middle, .split-cell-triple-right').forEach(cell => {
+                    if (cell.innerHTML.trim() !== '') {
+                        cell.addEventListener('contextmenu', function(e) {
+                            if (!state.isViewOnly) {
+                                showCellContextMenu(e, cell);
+                            }
+                        });
+                    }
+                });
+            }
         }
+        
+        // Update display with loaded state
+        updateMainDisplay();
+        
     } catch (error) {
         console.error('Error loading view-only state:', error);
     }
@@ -2052,7 +2122,6 @@ function handleDragStart(e) {
     if (parent.classList.contains('status-box-content')) {
         state.draggedFromArea = parent.closest('.status-box').dataset.area;
     } else if (parent.classList.contains('pod')) {
-        // Dragging from within a pod
         const podElement = parent.closest('.pod');
         if (podElement.parentElement.classList.contains('status-box-content')) {
             state.draggedFromArea = podElement.parentElement.closest('.status-box').dataset.area;
@@ -2066,21 +2135,38 @@ function handleDragStart(e) {
     state.draggedItem.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     
-    // FIXED: Create ghost image that maintains rotation
+    // Create ghost image that maintains rotation
     const ghost = state.draggedItem.cloneNode(true);
-    ghost.style.position = 'absolute';
+    ghost.style.position = 'fixed';
     ghost.style.top = '-1000px';
+    ghost.style.left = '-1000px';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.opacity = '0.7';
     
-    // Get the computed transform to preserve rotation
-    const currentTransform = window.getComputedStyle(state.draggedItem).transform;
-    ghost.style.transform = currentTransform; // Preserve exact rotation
+    // Get the current rotation from the boat data
+    const boatId = parseInt(state.draggedItem.id.replace('boat-wrapper-', ''));
+    const boatData = state.boats.get(boatId);
+    if (boatData && boatData.rotation) {
+        ghost.style.transform = `rotate(${boatData.rotation}deg)`;
+    } else {
+        // Fallback to computed style
+        const computedStyle = window.getComputedStyle(state.draggedItem);
+        ghost.style.transform = computedStyle.transform;
+    }
     
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, e.offsetX, e.offsetY);
+    
+    // Use the ghost as drag image
+    const rect = state.draggedItem.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
     
     // Clean up ghost after drag starts
     setTimeout(() => {
-        document.body.removeChild(ghost);
+        if (ghost && ghost.parentNode) {
+            document.body.removeChild(ghost);
+        }
     }, 0);
 }
 
@@ -2103,18 +2189,33 @@ function handlePodDragStart(e) {
     
     // Create ghost with rotation preserved
     const ghost = state.draggedItem.cloneNode(true);
-    ghost.style.position = 'absolute';
+    ghost.style.position = 'fixed';
     ghost.style.top = '-1000px';
+    ghost.style.left = '-1000px';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.opacity = '0.7';
     
-    // Preserve pod rotation
-    const currentTransform = window.getComputedStyle(state.draggedItem).transform;
-    ghost.style.transform = currentTransform;
+    // Get pod rotation
+    const podId = state.draggedItem.dataset.podId;
+    const pod = state.pods.get(podId);
+    if (pod && pod.rotation) {
+        ghost.style.transform = `rotate(${pod.rotation}deg)`;
+    } else {
+        const computedStyle = window.getComputedStyle(state.draggedItem);
+        ghost.style.transform = computedStyle.transform;
+    }
     
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, e.offsetX, e.offsetY);
+    
+    const rect = state.draggedItem.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
     
     setTimeout(() => {
-        document.body.removeChild(ghost);
+        if (ghost && ghost.parentNode) {
+            document.body.removeChild(ghost);
+        }
     }, 0);
 }
 
@@ -2319,10 +2420,19 @@ function createPodElement(pod, isSmallBox = false) {
             rotationHandle.style.top = '-15px';
             rotationHandle.style.left = '50%';
             rotationHandle.style.transform = 'translateX(-50%)';
+            rotationHandle.style.opacity = '1'; // Make it visible
+            rotationHandle.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            rotationHandle.style.width = '12px';
+            rotationHandle.style.height = '12px';
+            rotationHandle.style.borderRadius = '50%';
+            rotationHandle.style.border = '2px solid #333';
+            rotationHandle.style.cursor = 'grab';
+            rotationHandle.style.zIndex = '100';
             rotationHandle.title = 'Click and drag to rotate pod';
             podDiv.appendChild(rotationHandle);
             
             rotationHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handlePodRotationStart(e, podDiv, pod.id);
             });
@@ -2482,16 +2592,16 @@ function showBoatContextMenu(e, boatId) {
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-platform"></span>
-            Platform Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Platform Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px; max-height: 300px; overflow-y: auto;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform')">Complete</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-pierside"></span>
-            Pierside Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Pierside Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px; max-height: 300px; overflow-y: auto;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside-hold')">Hold</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside')">Complete</div>
@@ -2499,16 +2609,16 @@ function showBoatContextMenu(e, boatId) {
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-pretow"></span>
-            Pre-Tow Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Pre-Tow Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px; max-height: 300px; overflow-y: auto;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow')">Complete</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-operational"></span>
-            Post-Tow Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Post-Tow Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px; max-height: 300px; overflow-y: auto;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational')">Complete</div>
             </div>
@@ -2564,19 +2674,35 @@ function showBoatInPodContextMenu(e, boatId, podId) {
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-platform"></span>
-            Platform Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Platform Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'platform')">Complete</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
             <span class="status-indicator-menu status-pierside"></span>
-            Pierside Check ▶
-            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 120px;">
+            Pierside Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px;">
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside-start')">Start</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside-hold')">Hold</div>
                 <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pierside')">Complete</div>
+            </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="status-indicator-menu status-pretow"></span>
+            Pre-Tow Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px;">
+                <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow-start')">Start</div>
+                <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'pretow')">Complete</div>
+            </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="status-indicator-menu status-operational"></span>
+            Post-Tow Check
+            <div class="submenu" style="display: none; position: absolute; left: 100%; top: 0; background: #2a2a2a; border: 2px solid #444; border-radius: 8px; min-width: 150px;">
+                <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational-start')">Start</div>
+                <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'operational')">Complete</div>
             </div>
         </div>
         <div class="context-menu-item" onclick="updateBoatStatusFromMenu(${boatId}, 'trouble')">
@@ -2584,18 +2710,50 @@ function showBoatInPodContextMenu(e, boatId, podId) {
             Trouble
         </div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" style="font-weight: bold;">Check Status (Entire Pod)</div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'none')">
+            All No Check
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'platform-start')">
+            All Platform Start
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'platform')">
+            All Platform Complete
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'pierside-start')">
+            All Pierside Start
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'pierside-hold')">
+            All Pierside Hold
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'pierside')">
+            All Pierside Complete
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'pretow-start')">
+            All Pre-Tow Start
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'pretow')">
+            All Pre-Tow Complete
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'operational-start')">
+            All Post-Tow Start
+        </div>
+        <div class="context-menu-item" onclick="updatePodCheckStatusFromMenu('${podId}', 'operational')">
+            All Post-Tow Complete
+        </div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" style="font-weight: bold;">Movement (Entire Pod)</div>
         <div class="context-menu-item" onclick="updatePodStatusFromMenu('${podId}', 'tow')">
-            Being Towed
+            All Being Towed
         </div>
         <div class="context-menu-item" onclick="updatePodStatusFromMenu('${podId}', 'transit')">
-            In Transit
+            All In Transit
         </div>
         <div class="context-menu-item" onclick="updatePodStatusFromMenu('${podId}', 'operational-area')">
-            Operational Area
+            All Operational Area
         </div>
         <div class="context-menu-item" onclick="updatePodStatusFromMenu('${podId}', 'return-pier')">
-            Return to Pier
+            All Return to Pier
         </div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" onclick="breakUpPod('${podId}')">
@@ -2603,7 +2761,7 @@ function showBoatInPodContextMenu(e, boatId, podId) {
         </div>
     `;
     
-    positionContextMenu(menu, e.pageX, e.pageY);
+    positionContextMenu(menu, e.clientX, e.clientY);
     setupSubmenuHover(menu);
 }
 
@@ -3007,6 +3165,15 @@ window.applyManualOverride = function(cellId) {
     // Save table
     const tableHTML = document.getElementById('statusTableBody').innerHTML;
     localStorage.setItem('statusTableHTML', tableHTML);
+
+    // Send manual update to Google Sheets
+    const row = cell.closest('tr');
+    const boatId = parseInt(row.dataset.boatId);
+    const boat = state.boats.get(boatId);
+    if (boat) {
+        const status = statusType.replace('-complete', '').replace('-start', '').replace('-hold', '');
+        sendToGoogleSheets(boatId, boat, statusType, operatorInput, timestamp);
+    }
     
     // Remove dialog
     document.querySelectorAll('.manual-override-dialog').forEach(d => d.remove());
@@ -3057,6 +3224,16 @@ function updateBoatStatus(boatId, newStatus, operator = 'Unknown') {
         // Update visual immediately
         if (boatData.boat) {
             boatData.boat.className = `boat boat-type-${boatData.type} status-${newStatus}`;
+        }
+
+        // Update boat in main display if it's there
+        const mainDisplay = document.getElementById('mainDisplay');
+        const displayBoat = mainDisplay.querySelector(`#boat-wrapper-${boatId}`);
+        if (displayBoat) {
+            const boatInner = displayBoat.querySelector('.boat');
+            if (boatInner) {
+                boatInner.className = `boat boat-type-${boatData.type} status-${newStatus}`;
+            }
         }
         
         // Update all instances of this boat
@@ -3416,6 +3593,17 @@ function updateTableCell(row, columnStatus, actualStatus, operator, timestamp, d
     cell.dataset.time = timeStr;
     cell.dataset.date = dateStr;
     cell.dataset.operator = operator;
+
+    // For movement statuses, inherit the boat's check status color
+    if (['tow', 'transit', 'oparea', 'return'].includes(columnStatus)) {
+        const boatId = parseInt(row.dataset.boatId);
+        const boat = state.boats.get(boatId);
+        if (boat && boat.checkStatus) {
+            // Apply check status color to movement cell
+            const checkColor = boat.checkStatus.replace('-start', '').replace('-complete', '').replace('-hold', '');
+            cell.style.backgroundColor = getStatusColor(checkColor);
+        }
+    }
     
     // Add context menu for manual override if not already added
     if (!cell.hasAttribute('data-has-context-menu')) {
@@ -3428,6 +3616,19 @@ function updateTableCell(row, columnStatus, actualStatus, operator, timestamp, d
     }
 }
 
+//Helper function for updateTableCell color status
+    function getStatusColor(status) {
+    const colors = {
+        'none': 'rgba(255, 0, 0, 0.7)',
+        'platform': 'rgba(255, 140, 0, 0.7)',
+        'pierside': 'rgba(255, 255, 0, 0.7)',
+        'pretow': 'rgba(255, 255, 255, 0.7)',
+        'operational': 'rgba(0, 255, 0, 0.7)',
+        'trouble': 'rgba(255, 0, 0, 0.7)'
+    };
+    return colors[status] || 'rgba(128, 128, 128, 0.3)';
+}
+    
 // Clear status table
 window.clearStatusTable = function() {
     if (confirm('Are you sure you want to clear the status tracking table?')) {
@@ -3651,6 +3852,17 @@ async function updateFromServerState() {
         if (state.isViewOnly && serverState.uiState) {
             applyUIState(serverState.uiState);
         }
+
+        // Update UI state for ALL instances to maintain synchronization
+        if (serverState.uiState) {
+            // Don't change display for non-view-only during normal polling
+            const currentDisplay = state.currentDisplay;
+            applyUIState(serverState.uiState);
+            if (!state.isViewOnly) {
+                state.currentDisplay = currentDisplay;
+                document.getElementById('mainDisplaySelect').value = currentDisplay;
+            }
+        }
         
         updateBoatCount();
         updateSmallBoxes();
@@ -3715,23 +3927,96 @@ function updateBoatStatusFromServer(boatId, newStatus, operator) {
 function applyUIState(uiState) {
     if (!uiState) return;
     
-    // Apply backgrounds
+    // Apply backgrounds for all areas
     if (uiState.backgrounds) {
-        Object.entries(uiState.backgrounds).forEach(([area, bgData]) => {
-            state.areaBackgrounds.set(area, bgData);
-            localStorage.setItem(`background-${area}`, bgData);
-        });
+        if (typeof uiState.backgrounds === 'string') {
+            try {
+                const bgs = JSON.parse(uiState.backgrounds);
+                Object.entries(bgs).forEach(([area, bgData]) => {
+                    state.areaBackgrounds.set(area, bgData);
+                    localStorage.setItem(`background-${area}`, bgData);
+                });
+            } catch (e) {
+                console.error('Error parsing backgrounds:', e);
+            }
+        } else {
+            Object.entries(uiState.backgrounds).forEach(([area, bgData]) => {
+                state.areaBackgrounds.set(area, bgData);
+                localStorage.setItem(`background-${area}`, bgData);
+            });
+        }
     }
     
-    // Apply layouts
+    // Apply layouts for all areas
     if (uiState.layouts) {
-        Object.entries(uiState.layouts).forEach(([area, layout]) => {
-            state.areaLayouts.set(area, layout);
-            localStorage.setItem(`areaLayout-${area}`, JSON.stringify(layout));
-        });
+        if (typeof uiState.layouts === 'string') {
+            try {
+                const layouts = JSON.parse(uiState.layouts);
+                Object.entries(layouts).forEach(([area, layout]) => {
+                    state.areaLayouts.set(area, layout);
+                    localStorage.setItem(`areaLayout-${area}`, JSON.stringify(layout));
+                });
+            } catch (e) {
+                console.error('Error parsing layouts:', e);
+            }
+        } else {
+            Object.entries(uiState.layouts).forEach(([area, layout]) => {
+                state.areaLayouts.set(area, layout);
+                localStorage.setItem(`areaLayout-${area}`, JSON.stringify(layout));
+            });
+        }
     }
     
-    // FIXED: Don't change current display during normal polling
+    // Apply boat positions if available
+    if (uiState.boats) {
+        let boatPositions = uiState.boats;
+        if (typeof boatPositions === 'string') {
+            try {
+                boatPositions = JSON.parse(boatPositions);
+            } catch (e) {
+                console.error('Error parsing boat positions:', e);
+            }
+        }
+        if (Array.isArray(boatPositions)) {
+            boatPositions.forEach(boatPos => {
+                const boat = state.boats.get(boatPos.id);
+                if (boat) {
+                    boat.x = boatPos.x;
+                    boat.y = boatPos.y;
+                    boat.rotation = boatPos.rotation;
+                    boat.location = boatPos.location;
+                    if (boatPos.checkStatus) {
+                        boat.checkStatus = boatPos.checkStatus;
+                    }
+                }
+            });
+        }
+    }
+    
+    // Apply pod positions if available
+    if (uiState.pods) {
+        let podPositions = uiState.pods;
+        if (typeof podPositions === 'string') {
+            try {
+                podPositions = JSON.parse(podPositions);
+            } catch (e) {
+                console.error('Error parsing pod positions:', e);
+            }
+        }
+        if (Array.isArray(podPositions)) {
+            podPositions.forEach(podPos => {
+                const pod = state.pods.get(podPos.id);
+                if (pod) {
+                    pod.x = podPos.x;
+                    pod.y = podPos.y;
+                    pod.rotation = podPos.rotation;
+                    pod.location = podPos.location;
+                }
+            });
+        }
+    }
+    
+    // Apply current display for view-only mode
     if (state.isViewOnly && uiState.currentDisplay) {
         if (state.currentDisplay !== uiState.currentDisplay) {
             state.currentDisplay = uiState.currentDisplay;
@@ -3740,20 +4025,23 @@ function applyUIState(uiState) {
         }
     }
     
-    // Apply status table
+    // Apply status table with preserved timestamps
     if (uiState.statusTable) {
-        document.getElementById('statusTableBody').innerHTML = uiState.statusTable;
-        
-        // Re-attach context menus
-        document.querySelectorAll('td[data-status], .split-cell-left, .split-cell-right, .split-cell-triple-left, .split-cell-triple-middle, .split-cell-triple-right').forEach(cell => {
-            if (cell.innerHTML.trim() !== '') {
-                cell.addEventListener('contextmenu', function(e) {
-                    if (!state.isViewOnly) {
-                        showCellContextMenu(e, cell);
-                    }
-                });
-            }
-        });
+        const currentTable = document.getElementById('statusTableBody').innerHTML;
+        if (currentTable !== uiState.statusTable) {
+            document.getElementById('statusTableBody').innerHTML = uiState.statusTable;
+            
+            // Re-attach context menus
+            document.querySelectorAll('td[data-status], .split-cell-left, .split-cell-right, .split-cell-triple-left, .split-cell-triple-middle, .split-cell-triple-right').forEach(cell => {
+                if (cell.innerHTML.trim() !== '') {
+                    cell.addEventListener('contextmenu', function(e) {
+                        if (!state.isViewOnly) {
+                            showCellContextMenu(e, cell);
+                        }
+                    });
+                }
+            });
+        }
     }
 }
 
@@ -3794,17 +4082,50 @@ async function sendStatusUpdate(boatId, status, operator, checkStatus, timestamp
 // Send UI state to server
 async function sendUIStateToServer(stateData) {
     try {
+        // Collect all area layouts and backgrounds
+        const allLayouts = {};
+        const allBackgrounds = {};
+        
+        ['pier', 'tow', 'transit', 'operational-area'].forEach(area => {
+            // Get layout for this area
+            const layout = state.areaLayouts.get(area);
+            if (layout) {
+                allLayouts[area] = layout;
+            }
+            
+            // Get background for this area
+            const bg = state.areaBackgrounds.get(area);
+            if (bg) {
+                allBackgrounds[area] = bg;
+            }
+        });
+        
         const uiState = {
             type: 'saveUIState',
             state: {
-                layouts: Object.fromEntries(state.areaLayouts),
-                backgrounds: Object.fromEntries(state.areaBackgrounds),
+                layouts: allLayouts,
+                backgrounds: allBackgrounds,
                 currentDisplay: state.currentDisplay,
                 statusTable: document.getElementById('statusTableBody').innerHTML,
                 pierAreaDimensions: {
                     originalWidth: "1200",
                     originalHeight: "600"
                 },
+                boats: Array.from(state.boats.entries()).map(([id, boat]) => ({
+                    id: id,
+                    x: boat.x,
+                    y: boat.y,
+                    rotation: boat.rotation,
+                    location: boat.location,
+                    checkStatus: boat.checkStatus
+                })),
+                pods: Array.from(state.pods.entries()).map(([id, pod]) => ({
+                    id: id,
+                    x: pod.x,
+                    y: pod.y,
+                    rotation: pod.rotation,
+                    location: pod.location
+                })),
                 timestamp: new Date().toISOString()
             }
         };
@@ -3818,13 +4139,28 @@ async function sendUIStateToServer(stateData) {
             body: JSON.stringify(uiState)
         });
         
+        // Also send to Google Sheets if configured
+        const webhookUrl = localStorage.getItem('googleSheetsWebhook');
+        if (webhookUrl) {
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: 'uiState',
+                    ...uiState.state
+                })
+            });
+        }
+        
         console.log('UI state sent to server');
     } catch (error) {
         console.error('Error sending UI state to server:', error);
     }
 }
 
-// FIXED: Google Sheets Integration with StatusLog format
+// Google Sheets Integration
 function sendToGoogleSheets(boatId, boatData, status, operator, timestamp) {
     const webhookUrl = localStorage.getItem('googleSheetsWebhook');
     if (!webhookUrl) return;
@@ -3834,46 +4170,41 @@ function sendToGoogleSheets(boatId, boatData, status, operator, timestamp) {
     
     // Determine if this is a check or movement status
     const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
-    const isCheckStatus = !movementStatuses.includes(status);
+    const isMovement = movementStatuses.includes(status);
     
     // Store old status before update
     const oldStatus = boatData.status || 'none';
     
-    // Create data for StatusLog sheet
+    // Create StatusLog data matching exact headers
     const statusLogData = {
         Timestamp: (timestamp || new Date()).toISOString(),
-        BoatId: boatId,
-        BoatType: boatData.type,
+        BoatId: boatId.toString(),
+        BoatType: boatData.type.toString(),
         UserGroup: boatData.userGroup,
         OldStatus: oldStatus,
         NewStatus: status,
         Location: boatData.location,
         Operator: operator,
-        StatusType: isCheckStatus ? 'Check' : 'Movement',
+        StatusType: isMovement ? 'Movement' : 'Check',
         CurrentArea: state.currentDisplay
     };
     
-    // Complete data format (preserves ALL functionality)
-    const completeData = {
-        timestamp: (timestamp || new Date()).toISOString(),
-        boat: boatName,
-        boatId: boatId,
+    // Create Boats sheet data
+    const boatsData = {
+        id: boatId,
         type: boatData.type,
-        group: boatData.userGroup === 'leg' ? 'Leg' : 'Lat',
+        userGroup: boatData.userGroup,
         status: status,
-        checkStatus: boatData.checkStatus || 'none',
+        checkStatus: boatData.checkStatus || status,
         location: boatData.location,
-        operator: operator,
-        x: boatData.x,
-        y: boatData.y,
+        x: boatData.x || 0,
+        y: boatData.y || 0,
         rotation: boatData.rotation || 0,
-        currentArea: state.currentDisplay,
-        isCheckStatus: isCheckStatus,
-        oldStatus: oldStatus,
-        statusType: isCheckStatus ? 'Check' : 'Movement'
+        operator: operator,
+        lastUpdated: (timestamp || new Date()).toISOString()
     };
     
-    // Send both formats in one request
+    // Send complete package
     fetch(webhookUrl, {
         method: 'POST',
         headers: {
@@ -3881,14 +4212,16 @@ function sendToGoogleSheets(boatId, boatData, status, operator, timestamp) {
         },
         body: JSON.stringify({
             type: 'statusUpdate',
-            statusLog: statusLogData,  // For StatusLog sheet
-            fullData: completeData,    // For other sheets
-            ...completeData            // Backward compatibility
+            statusLog: statusLogData,
+            boatsData: boatsData,
+            boat: boatName,
+            boatId: boatId,
+            timestamp: (timestamp || new Date()).toISOString()
         })
     }).then(response => {
-        console.log('Google Sheets update sent with all data:', {
+        console.log('Google Sheets update sent:', {
             statusLog: statusLogData,
-            fullData: completeData
+            boatsData: boatsData
         });
     }).catch(err => {
         console.error('Google Sheets update failed:', err);
