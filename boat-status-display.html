@@ -1230,6 +1230,14 @@ function initializeSystem() {
     // Load saved state
     loadSavedState();
 
+    // Always try to fetch boats from server on startup
+    setTimeout(() => {
+        if (state.boats.size === 0) {
+            console.log('No boats found locally, fetching from server...');
+            fetchBoatsFromServer();
+        }
+    }, 1000); // Small delay to ensure everything is initialized
+    
     // Start polling
     startPolling();
 
@@ -3083,34 +3091,27 @@ function sendToGoogleSheets(boatId, boatData, updateInfo) {
     });
 }
 
-// Send UI state to server
+// Send UI state to server - SPLIT INTO CHUNKS TO AVOID SIZE LIMITS
 async function sendUIStateToServer() {
     try {
-        // Collect all layouts and backgrounds
+        // Collect all layouts
         const layouts = {};
-        const backgrounds = {};
-        
         ['pier', 'tow', 'transit', 'operational-area'].forEach(area => {
             const layout = state.areaLayouts.get(area);
             if (layout) {
                 layouts[area] = layout;
             }
-            
-            const bg = state.areaBackgrounds.get(area);
-            if (bg) {
-                backgrounds[area] = bg;
-            }
         });
         
-        // Create boat states with proper separation
+        // Create boat states
         const boatStates = {};
         state.boats.forEach((boat, id) => {
             boatStates[id] = {
                 x: boat.x,
                 y: boat.y,
                 rotation: boat.rotation || 0,
-                location: boat.location,         // Physical location
-                checkStatus: boat.checkStatus,   // Color status
+                location: boat.location,
+                checkStatus: boat.checkStatus,
                 podId: boat.podId
             };
         });
@@ -3118,19 +3119,46 @@ async function sendUIStateToServer() {
         // Create pod states
         const podStates = Array.from(state.pods.entries());
         
+        // Send backgrounds separately for each area to avoid size limits
+        for (const area of ['pier', 'tow', 'transit', 'operational-area']) {
+            const bg = state.areaBackgrounds.get(area);
+            if (bg && bg.length > 1000) { // Only send if there's actual image data
+                try {
+                    // Send each background as a separate update
+                    await fetch(N8N_CONFIG.statusWebhook, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            type: 'saveBackgroundState',
+                            area: area,
+                            background: bg,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                    console.log(`Background for ${area} sent separately`);
+                } catch (bgError) {
+                    console.error(`Failed to send background for ${area}:`, bgError);
+                    // Continue even if one background fails
+                }
+            }
+        }
+        
+        // Send main UI state without backgrounds
         const uiState = {
             type: 'saveUIState',
             state: {
                 layouts: JSON.stringify(layouts),
-                backgrounds: JSON.stringify(backgrounds),
                 boatStates: JSON.stringify(boatStates),
                 podStates: JSON.stringify(podStates),
                 currentDisplay: state.currentDisplay,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                // Flag that backgrounds are sent separately
+                backgroundsSentSeparately: true
             }
         };
         
-        // Send to n8n webhook
         await fetch(N8N_CONFIG.statusWebhook, {
             method: 'POST',
             headers: {
@@ -3139,22 +3167,8 @@ async function sendUIStateToServer() {
             body: JSON.stringify(uiState)
         });
         
-        // Also send to Google Sheets webhook if configured
-        const webhookUrl = localStorage.getItem('googleSheetsWebhook');
-        if (webhookUrl) {
-            await fetch(webhookUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    type: 'uiStateUpdate',
-                    uiState: uiState.state
-                })
-            });
-        }
+        console.log('UI state sent to server (backgrounds sent separately)');
         
-        console.log('UI state sent to server');
     } catch (error) {
         console.error('Error sending UI state to server:', error);
     }
@@ -3628,6 +3642,12 @@ function loadSavedState() {
             webhookInput.value = webhookUrl;
         }
     }
+
+    // Force fetch boats from server if none loaded locally
+    if (state.boats.size === 0) {
+        console.log('No local boats, fetching from server...');
+        fetchBoatsFromServer();
+    }
     
     updateBoatCount();
     updatePodCount();
@@ -3635,6 +3655,52 @@ function loadSavedState() {
     updateSmallBoxes();
 }
 
+// ADD this new function right AFTER loadSavedState():
+async function fetchBoatsFromServer() {
+    try {
+        const response = await fetch(N8N_CONFIG.stateWebhook);
+        if (!response.ok) {
+            console.error('Failed to fetch boats:', response.status);
+            return;
+        }
+        
+        const data = await response.json();
+        if (data.boats && Array.isArray(data.boats)) {
+            console.log(`Fetching ${data.boats.length} boats from server`);
+            
+            // Set loading flag to prevent table updates
+            state.isLoadingLayouts = true;
+            
+            data.boats.forEach(boatData => {
+                const boatId = parseInt(boatData.id);
+                if (!state.boats.has(boatId)) {
+                    createBoat({
+                        id: boatId,
+                        type: parseInt(boatData.type) || (boatId <= 70 ? 1 : 2),
+                        userGroup: boatData.userGroup || 'leg',
+                        checkStatus: boatData.status || boatData.checkStatus || 'none',
+                        location: boatData.location || 'pier',
+                        x: parseFloat(boatData.x) || null,
+                        y: parseFloat(boatData.y) || null,
+                        rotation: parseFloat(boatData.rotation) || 0
+                    });
+                }
+            });
+            
+            // Clear loading flag
+            state.isLoadingLayouts = false;
+            
+            updateBoatCount();
+            updateMainDisplay();
+            updateSmallBoxes();
+            
+            console.log('Boats loaded from server successfully');
+        }
+    } catch (error) {
+        console.error('Error fetching boats from server:', error);
+    }
+}
+    
 // Generate view-only link
 window.generateViewOnlyLink = function() {
     const currentUrl = window.location.origin + window.location.pathname;
