@@ -2558,29 +2558,35 @@ function shouldCreateNewRow(lastRow, updateInfo) {
                     lastRow.querySelector('[data-status="operational"]')?.innerHTML
     };
     
-    const filledMovements = {
-        tow: lastRow.querySelector('[data-status="tow"]')?.innerHTML,
-        transit: lastRow.querySelector('[data-status="transit"]')?.innerHTML,
-        oparea: lastRow.querySelector('[data-status="oparea"]')?.innerHTML,
-        'return': lastRow.querySelector('[data-status="return"]')?.innerHTML
-    };
-    
     if (updateInfo.type === 'movement') {
         // For movements, create new row if this movement is already filled
         const movementColumn = getMovementColumn(updateInfo.status);
-        if (filledMovements[movementColumn]) {
-            // Check if any check is complete - if yes, probably a new cycle
-            const hasCompleteCheck = Object.values(filledChecks).some(v => v);
-            return hasCompleteCheck;
+        if (lastRow.querySelector(`[data-status="${movementColumn}"]`)?.innerHTML) {
+            return true; // Already has this movement, need new row
         }
         return false;
     } else {
-        // For check status, create new row if this check type is already complete
+        // For check status, ALWAYS create new row if check type is already complete
         const checkType = updateInfo.status.replace('-start', '').replace('-hold', '').replace('-complete', '');
-        if (filledChecks[checkType]) {
-            // This check was already completed, likely a redo
-            return true;
+        
+        // If this exact check phase is already filled, we need a new row
+        const statusMap = {
+            'platform-start': 'platform-start',
+            'platform': 'platform-complete',
+            'pierside-start': 'pierside-start', 
+            'pierside-hold': 'pierside-hold',
+            'pierside': 'pierside-complete',
+            'pretow-start': 'pretow-start',
+            'pretow': 'pretow-complete',
+            'operational-start': 'operational-start',
+            'operational': 'operational-complete'
+        };
+        
+        const targetStatus = statusMap[updateInfo.status] || updateInfo.status;
+        if (lastRow.querySelector(`[data-status="${targetStatus}"]`)?.innerHTML) {
+            return true; // This check phase already done, need new row for redo
         }
+        
         return false;
     }
 }
