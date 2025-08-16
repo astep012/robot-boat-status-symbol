@@ -1670,7 +1670,7 @@ function stopPolling() {
 
 // FIXED: Update from server state - ONLY syncs, doesn't create table entries
 async function updateFromServerState() {
-    if (state.isViewOnly) return; // View-only mode handled separately
+    if (state.isViewOnly) return;
     
     try {
         const response = await fetch(N8N_CONFIG.stateWebhook);
@@ -1682,26 +1682,49 @@ async function updateFromServerState() {
         const serverState = JSON.parse(text);
         if (!serverState || !serverState.boats) return;
         
-        // Only sync state, don't add table entries
+        let hasChanges = false;
+        
         serverState.boats.forEach(serverBoat => {
-            const localBoat = state.boats.get(serverBoat.id);
-            if (localBoat) {
+            const boatId = parseInt(serverBoat.id);
+            let localBoat = state.boats.get(boatId);
+            
+            // If boat doesn't exist locally, create it
+            if (!localBoat) {
+                console.log(`Creating new boat ${boatId} from server`);
+                createBoat({
+                    id: boatId,
+                    type: parseInt(serverBoat.type) || (boatId <= 70 ? 1 : 2),
+                    userGroup: serverBoat.userGroup || 'leg',
+                    checkStatus: serverBoat.status || serverBoat.checkStatus || 'none',
+                    location: serverBoat.location || 'pier',
+                    x: parseFloat(serverBoat.x) || null,
+                    y: parseFloat(serverBoat.y) || null,
+                    rotation: parseFloat(serverBoat.rotation) || 0
+                });
+                hasChanges = true;
+            } else {
                 // Sync check status if different
-                if (serverBoat.checkStatus && serverBoat.checkStatus !== localBoat.checkStatus) {
-                    localBoat.checkStatus = serverBoat.checkStatus;
-                    updateBoatVisuals(serverBoat.id, serverBoat.checkStatus);
+                const serverCheckStatus = serverBoat.status || serverBoat.checkStatus;
+                if (serverCheckStatus && serverCheckStatus !== localBoat.checkStatus) {
+                    console.log(`Updating boat ${boatId} check status: ${localBoat.checkStatus} -> ${serverCheckStatus}`);
+                    localBoat.checkStatus = serverCheckStatus;
+                    localBoat.status = serverCheckStatus;
+                    updateBoatVisuals(boatId, serverCheckStatus);
+                    hasChanges = true;
                 }
                 
-                // Sync location if different (but don't physically move)
+                // Sync location if different
                 if (serverBoat.location && serverBoat.location !== localBoat.location) {
+                    console.log(`Boat ${boatId} location changed: ${localBoat.location} -> ${serverBoat.location}`);
                     localBoat.location = serverBoat.location;
+                    hasChanges = true;
                 }
             }
         });
         
-        // Sync UI state
-        if (serverState.uiState) {
-            syncUIState(serverState.uiState);
+        if (hasChanges) {
+            updateMainDisplay();
+            updateSmallBoxes();
         }
         
     } catch (error) {
