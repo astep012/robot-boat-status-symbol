@@ -4551,6 +4551,7 @@ window.clearStatusHistory = function() {
 window.checkStatusHistory = function() {
     console.log('Status History entries:', state.statusLogHistory.size);
     console.log('First 10 entries:', Array.from(state.statusLogHistory.keys()).slice(0, 10));
+}
 
 // Load saved state on startup
 function loadSavedState() {
