@@ -2693,6 +2693,23 @@ async function updateFromServerState() {
                     updateSmallBoxes();
                 }
                 
+                // CRITICAL FIX: Preserve check status colors from Google Sheets
+                // The serverState should include both the last status AND the checkStatus
+                if (boatData.checkStatus) {
+                    existingBoat.checkStatus = boatData.checkStatus;
+                    existingBoat.status = boatData.checkStatus;
+                    
+                    // Update visual representation with check status color
+                    updateBoatVisuals(boatData.id, boatData.checkStatus);
+                }
+                
+                // Update location if it changed (for movement status)
+                if (boatData.location && existingBoat.location !== boatData.location) {
+                    existingBoat.location = boatData.location;
+                    updateMainDisplay();
+                    updateSmallBoxes();
+                }
+                
                 // Process status updates with timestamp check
                 if (boatData.operator && !['Initial', 'Assignment System', 'n8n Update'].includes(boatData.operator)) {
                     // Use timestamp in the log key for exact deduplication
@@ -2706,19 +2723,9 @@ async function updateFromServerState() {
                             boatData.id, 
                             boatData.status, 
                             boatData.operator, 
-                            boatData.checkStatus,
-                            boatData.lastUpdated  // Pass timestamp
+                            boatData.checkStatus,  // Pass the check status
+                            boatData.lastUpdated   // Pass timestamp
                         );
-                        
-                        // If it was a movement update, ensure check status is preserved
-                        if (['tow', 'transit', 'operational-area', 'return-pier'].includes(boatData.status)) {
-                            const boat = state.boats.get(boatData.id);
-                            if (boat && boatData.checkStatus) {
-                                boat.checkStatus = boatData.checkStatus;
-                                boat.status = boatData.checkStatus;
-                                updateBoatVisuals(boatData.id, boatData.checkStatus);
-                            }
-                        }
                         
                         state.statusLogHistory.set(logKey, true);
                         
@@ -2731,26 +2738,31 @@ async function updateFromServerState() {
                 }
                 
             } else {
-                // Create new boat
+                // Create new boat with proper initial status
                 console.log(`Creating new boat ${boatData.id}`);
                 const newBoat = createBoat({
                     id: boatData.id,
                     type: boatData.type || (boatData.id <= 70 ? 1 : 2),
                     userGroup: boatData.userGroup,
-                    status: 'none',
-                    checkStatus: 'none',
+                    status: boatData.checkStatus || 'none',  // Use checkStatus from server
+                    checkStatus: boatData.checkStatus || 'none',
                     location: boatData.location || 'pier',
                     x: null,
                     y: null,
                     rotation: 0
                 });
                 
+                // Set the proper check status color
+                if (boatData.checkStatus && boatData.checkStatus !== 'none') {
+                    updateBoatVisuals(boatData.id, boatData.checkStatus);
+                }
+                
                 // Check if this boat already has entries in the table
                 const tbody = document.getElementById('statusTableBody');
                 const existingTableRow = tbody.querySelector(`tr[data-boat-id="${boatData.id}"]`);
                 
                 // Only log initial status if boat is truly new to the table
-                if (!existingTableRow) {
+                if (!existingTableRow && !state.isLoadingLayouts) {
                     // Use a unique timestamp for the initial entry
                     const initialLogKey = `${boatData.id}-none-Initial-${Date.now()}`;
                     if (!state.statusLogHistory.has(initialLogKey)) {
@@ -2875,7 +2887,7 @@ async function sendStatusUpdate(boatId, status, operator, checkStatus, timestamp
                 location: boatData.location,
                 operator: operator,
                 timestamp: (timestamp || new Date()).toISOString(),
-                checkStatus: checkStatus || boatData.checkStatus || boatData.status,
+                checkStatus: checkStatus || boatData.checkStatus || boatData.status,  // Always send checkStatus
                 isCheckStatus: !['tow', 'transit', 'operational-area', 'return-pier'].includes(status),
                 currentArea: currentArea
             })
