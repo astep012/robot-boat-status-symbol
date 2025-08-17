@@ -1668,7 +1668,7 @@ function stopPolling() {
     }
 }
 
-// FIXED: Update from server state - ONLY syncs, doesn't create table entries
+// FIXED: Update from server state - Syncs AND adds operator actions to table
 async function updateFromServerState() {
     if (state.isViewOnly) return;
     
@@ -1702,6 +1702,12 @@ async function updateFromServerState() {
                     rotation: parseFloat(serverBoat.rotation) || 0
                 });
                 hasChanges = true;
+                
+                // Add initial row to status table for new boat
+                localBoat = state.boats.get(boatId);
+                if (localBoat) {
+                    addStatusToTable(boatId, localBoat, 'none', 'Initial', new Date().toISOString());
+                }
             } else {
                 // Sync check status if different
                 const serverCheckStatus = serverBoat.status || serverBoat.checkStatus;
@@ -1718,6 +1724,40 @@ async function updateFromServerState() {
                     console.log(`Boat ${boatId} location changed: ${localBoat.location} -> ${serverBoat.location}`);
                     localBoat.location = serverBoat.location;
                     hasChanges = true;
+                }
+                
+                // CRITICAL: Add to status table if this is an operator action
+                const hasRealOperator = serverBoat.operator && 
+                                       !['System', 'Initial', 'Auto'].includes(serverBoat.operator);
+                
+                if (hasRealOperator && serverBoat.lastUpdated) {
+                    // Create unique key for deduplication
+                    const updateKey = `${boatId}-${serverBoat.status}-${serverBoat.operator}-${serverBoat.lastUpdated}`;
+                    
+                    if (!state.processedUpdates) {
+                        state.processedUpdates = new Set();
+                    }
+                    
+                    if (!state.processedUpdates.has(updateKey)) {
+                        console.log(`Adding status table entry from server: Boat ${boatId}, Status ${serverBoat.status}, Operator ${serverBoat.operator}`);
+                        
+                        // Add to status table
+                        addStatusToTable(
+                            boatId, 
+                            localBoat, 
+                            serverBoat.status, 
+                            serverBoat.operator,
+                            serverBoat.lastUpdated
+                        );
+                        
+                        state.processedUpdates.add(updateKey);
+                        
+                        // Clean old entries
+                        if (state.processedUpdates.size > 500) {
+                            const entries = Array.from(state.processedUpdates);
+                            entries.slice(0, 100).forEach(key => state.processedUpdates.delete(key));
+                        }
+                    }
                 }
             }
         });
