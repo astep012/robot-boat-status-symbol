@@ -1176,6 +1176,7 @@ const state = {
     movementHistory: new Map(),     // Track movement updates
     tableEntryHistory: new Map(),   // Track what's in the table
     statusLogHistory: new Map(),    // Track all status updates
+    processedUpdates: new Set(),    // Track processed updates
     
     rowTracking: new Map(),
     troubleStatusMemory: new Map(),
