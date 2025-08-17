@@ -2486,19 +2486,40 @@ function updateBoatStatus(boatId, newStatus, operator = 'Unknown') {
 }
 
 // Add status to table - Smart table entry addition
-function addStatusToTable(boatId, boatData, updateInfo) {
+function addStatusToTable(boatId, boatData, status, operator, timestamp) {
     const tbody = document.getElementById('statusTableBody');
     const prefix = boatData.type === 1 ? 'C' : 'G';
     const paddedNumber = boatId.toString().padStart(2, '0');
     const boatName = `${prefix}${paddedNumber}`;
     
+    // Normalize the status
+    const movementStatuses = ['tow', 'transit', 'operational-area', 'return-pier'];
+    const normalizedStatus = status === 'pierside-complete' ? 'pierside' :
+                           status === 'platform-complete' ? 'platform' :
+                           status === 'pretow-complete' ? 'pretow' :
+                           status === 'operational-complete' ? 'operational' :
+                           status;
+    
+    // Create updateInfo object
+    const updateInfo = {
+        type: movementStatuses.includes(normalizedStatus) ? 'movement' : 'check',
+        status: normalizedStatus,
+        operator: operator || 'Unknown',
+        timestamp: timestamp || new Date().toISOString()
+    };
+    
     // Create unique key for this update
     const updateKey = `${boatId}-${updateInfo.type}-${updateInfo.status}-${updateInfo.operator}-${updateInfo.timestamp}`;
     
     // Check if this exact update was already added
-    if (state.tableEntryHistory.has(updateKey)) {
+    if (state.tableEntryHistory && state.tableEntryHistory.has(updateKey)) {
         console.log(`Duplicate table entry prevented: ${updateKey}`);
         return;
+    }
+    
+    // Initialize tableEntryHistory if it doesn't exist
+    if (!state.tableEntryHistory) {
+        state.tableEntryHistory = new Map();
     }
     
     // For check status updates, check if we're just updating the same check
@@ -2538,6 +2559,7 @@ function addStatusToTable(boatId, boatData, updateInfo) {
         const needNewRow = shouldCreateNewRow(lastRow, updateInfo);
         
         if (needNewRow) {
+            if (!state.boatRowCounts) state.boatRowCounts = new Map();
             const rowCount = state.boatRowCounts.get(boatId) || 1;
             state.boatRowCounts.set(boatId, rowCount + 1);
             targetRow = createNewRow(boatId, `${boatName} (${rowCount + 1})`, boatData);
@@ -2549,6 +2571,7 @@ function addStatusToTable(boatId, boatData, updateInfo) {
         // Create first row
         targetRow = createNewRow(boatId, boatName, boatData);
         insertRowInOrder(tbody, targetRow, boatId, boatData);
+        if (!state.boatRowCounts) state.boatRowCounts = new Map();
         state.boatRowCounts.set(boatId, 1);
     }
     
@@ -2562,7 +2585,7 @@ function addStatusToTable(boatId, boatData, updateInfo) {
     saveStatusTableState();
     
     // Send to Google Sheets
-    sendToGoogleSheets(boatId, boatData, updateInfo);
+    sendToGoogleSheets(boatId, boatData, updateInfo.status, updateInfo.operator);
     
     console.log(`Status recorded: ${boatName} - ${updateInfo.status} at ${updateInfo.timestamp} by ${updateInfo.operator}`);
 }
