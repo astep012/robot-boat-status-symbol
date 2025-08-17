@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orange USV Assignment Form</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            font-size: 1.1em;
+            color: #e0e0e0;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1.1em;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #00bfff;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 191, 255, 0.3);
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .radio-container {
+            flex: 1;
+        }
+
+        .radio-container input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .radio-label {
+            display: block;
+            padding: 15px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.1em;
+        }
+
+        .radio-container input[type="radio"]:checked + .radio-label {
+            border-color: #00bfff;
+            background: rgba(0, 191, 255, 0.2);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 191, 255, 0.3);
+        }
+
+        .radio-label.leg {
+            color: #b19cd9;
+        }
+
+        .radio-label.lat {
+            color: #00bfff;
+        }
+
+        .radio-container input[type="radio"]:checked + .radio-label.leg {
+            border-color: #b19cd9;
+            background: rgba(177, 156, 217, 0.2);
+            box-shadow: 0 4px 12px rgba(177, 156, 217, 0.3);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #00bfff, #b19cd9);
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 191, 255, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .assignment-list {
+            margin-top: 40px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .assignment-list h2 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: #00bfff;
+        }
+
+        .assignment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .boat-item {
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .boat-item.leg {
+            border-color: #b19cd9;
+            color: #b19cd9;
+        }
+
+        .boat-item.lat {
+            border-color: #00bfff;
+            color: #00bfff;
+        }
+
+        .boat-item:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .success-message {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .info-text {
+            margin-top: 10px;
+            text-align: center;
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        .info-text kbd {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        @media (max-width: 480px) {
+            .form-container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Orange USV Assignment Form</h1>
+        
+        <form id="assignmentForm">
+            <div class="form-group">
+                <label for="boatNumbers">Boat Numbers</label>
+                <textarea 
+                    id="boatNumbers" 
+                    name="boatNumbers" 
+                    placeholder="Enter boat numbers separated by spaces"
+                    required
+                ></textarea>
+                <div class="info-text">Enter numbers 1-160 (C boats: 1-70, G boats: 71-160)</div>
+            </div>
+
+            <div class="form-group">
+                <label>Select Group Assignment</label>
+                <div class="radio-group">
+                    <div class="radio-container">
+                        <input type="radio" id="leg" name="userGroup" value="leg" required>
+                        <label for="leg" class="radio-label leg">
+                            Leg (Purple)
+                        </label>
+                    </div>
+                    <div class="radio-container">
+                        <input type="radio" id="lat" name="userGroup" value="lat" required>
+                        <label for="lat" class="radio-label lat">
+                            Lat (Blue)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit">Assign Boats</button>
+        </form>
+
+        <div class="success-message" id="successMessage">
+            Boats assigned successfully!
+        </div>
+
+        <div class="assignment-list">
+            <h2>Current Assignments</h2>
+            <div class="assignment-grid" id="assignmentGrid">
+                <!-- Boat assignments will be displayed here -->
+            </div>
+        </div>
+     </div>
+
+    <script>    
+    // n8n webhook configuration
+    const N8N_ASSIGNMENT_WEBHOOK = 'http://n8n.tacticalleadingedge.com:5678/webhook/boat-assignments';
+    
+    // Function to send assignments to n8n
+    async function sendAssignmentsToN8n(assignments) {
+        try {
+            const response = await fetch(N8N_ASSIGNMENT_WEBHOOK, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    assignments: assignments
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Assignments sent successfully:', result);
+            return result;
+        } catch (error) {
+            console.error('Error sending assignments:', error);
+            throw error;
+        }
+    }
+	// Load and display current assignments on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAndDisplayAssignments();
+        });
+
+        document.getElementById('assignmentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const boatNumbersText = document.getElementById('boatNumbers').value.trim();
+            const selectedGroup = document.querySelector('input[name="userGroup"]:checked');
+            
+            if (!boatNumbersText || !selectedGroup) {
+                alert('Please enter boat numbers and select a group');
+                return;
+            }
+            
+            // Parse boat numbers
+            const boatNumbers = boatNumbersText.split(/\s+/).map(n => parseInt(n)).filter(n => !isNaN(n) && n >= 1 && n <= 160);
+            
+            if (boatNumbers.length === 0) {
+                alert('Please enter valid boat numbers between 1 and 160');
+                return;
+            }
+            
+            // Create assignments
+            const assignments = boatNumbers.map(num => ({
+                boatId: num,
+                userGroup: selectedGroup.value
+            }));
+            
+            // Send to n8n and display
+            sendAssignmentsToDisplay(assignments).then(() => {
+                // Save to localStorage only after successful send
+                saveAssignments(assignments);
+                
+                // Show success message
+                showSuccess(`Assigned ${boatNumbers.length} boats to ${selectedGroup.value === 'leg' ? 'Leg (Purple)' : 'Lat (Blue)'}`);
+                
+                // Clear form
+                document.getElementById('assignmentForm').reset();
+                
+                // Reload display
+                loadAndDisplayAssignments();
+            }).catch(error => {
+                // Error already handled in sendAssignmentsToDisplay
+                console.error('Assignment failed:', error);
+            });
+        }); 
+
+        async function sendAssignmentsToDisplay(assignments) {
+            console.log('Sending assignments to n8n:', assignments);
+            
+            try {
+                await sendAssignmentsToN8n(assignments);
+                console.log('Assignments sent successfully to n8n');
+            } catch (error) {
+                console.error('Failed to send assignments to n8n:', error);
+                alert('Failed to send assignments. Please check your connection and try again.');
+                throw error;
+            }
+        }
+
+        function saveAssignments(newAssignments) {
+            // Load existing assignments
+            const stored = localStorage.getItem('boatAssignments');
+            let allAssignments = stored ? JSON.parse(stored) : [];
+            
+            // Update or add new assignments
+            newAssignments.forEach(newAssignment => {
+                const index = allAssignments.findIndex(a => a.boatId === newAssignment.boatId);
+                if (index >= 0) {
+                    allAssignments[index] = newAssignment;
+                } else {
+                    allAssignments.push(newAssignment);
+                }
+            });
+            
+            // Save back to localStorage
+            localStorage.setItem('boatAssignments', JSON.stringify(allAssignments));
+        }
+
+        function loadAndDisplayAssignments() {
+            const stored = localStorage.getItem('boatAssignments');
+            if (!stored) {
+                document.getElementById('assignmentGrid').innerHTML = '<p style="color: #ccc; text-align: center;">No boats assigned yet</p>';
+                return;
+            }
+            
+            const assignments = JSON.parse(stored);
+            const grid = document.getElementById('assignmentGrid');
+            
+            // Sort by group (lat first, then leg) and then by number
+            assignments.sort((a, b) => {
+                if (a.userGroup !== b.userGroup) {
+                    return a.userGroup === 'lat' ? -1 : 1;
+                }
+                return a.boatId - b.boatId;
+            });
+            
+            // Display assignments
+            grid.innerHTML = assignments.map(item => {
+                const prefix = item.boatId <= 70 ? 'C' : 'G';
+                const paddedNumber = item.boatId.toString().padStart(2, '0');
+                return `<div class="boat-item ${item.userGroup}">${prefix}${paddedNumber} - ${item.userGroup === 'leg' ? 'Leg' : 'Lat'}</div>`;
+            }).join('');
+        }
+
+        function showSuccess(message) {
+            const successMsg = document.getElementById('successMessage');
+            successMsg.textContent = message;
+            successMsg.style.display = 'block';
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
